@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"Goblog/models/ctype"
-	"Goblog/models/res"
-	"Goblog/service/redis_ser"
+	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/res"
+	"Smart_delivery_locker/service/redis_ser"
 	"Smart_delivery_locker/utils/jwts"
 	"fmt"
 	"github.com/gin-gonic/gin"
