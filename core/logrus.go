@@ -50,9 +50,9 @@ func (t LogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		funcVal := entry.Caller.Function
 		fileVal := fmt.Sprintf("%s:%d", path.Base(entry.Caller.File), entry.Caller.Line)
 		//自定义输出路径
-		_, _ = fmt.Fprintf(b, "%s[%s] \x1b[%dm][%s]\x1b0m %s %s %s\n", log.Prefix, timesTamp, levelColor, entry.Level, funcVal, fileVal, entry.Message)
+		_, _ = fmt.Fprintf(b, "%s[%s] [%dm][%s]\x1b[0m %s %s %s\n", log.Prefix, timesTamp, levelColor, entry.Level, funcVal, fileVal, entry.Message)
 	} else {
-		_, _ = fmt.Fprintf(b, "%s[%s] \x1b[%dm][%s]\x1b0m %s\n", log.Prefix, timesTamp, levelColor, entry.Level, entry.Message)
+		_, _ = fmt.Fprintf(b, "%s[%s] [%dm][%s]\x1b[0m %s\n", log.Prefix, timesTamp, levelColor, entry.Level, entry.Message)
 	}
 	return b.Bytes(), nil
 }

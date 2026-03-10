@@ -3,6 +3,7 @@ package flag
 import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/service/user_ser"
 	"fmt"
 )
 
@@ -36,6 +37,13 @@ func CreateUser(permissions string) {
 		global.Log.Error("两次密码不一致,请重新输入")
 		return
 	}
+
+	err := user_ser.UserService{}.CreateUser(userName, password, role, email, "")
+	if err != nil {
+		global.Log.Error("[error] 创建用户失败", err)
+		return
+	}
+	global.Log.Infof("[success] 创建用户%s成功", userName)
 }
 
 func toString() string {

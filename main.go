@@ -2,8 +2,8 @@ package main
 
 import (
 	"Smart_delivery_locker/core"
+	"Smart_delivery_locker/flag"
 	"Smart_delivery_locker/global"
-	"flag"
 )
 
 func main() {
