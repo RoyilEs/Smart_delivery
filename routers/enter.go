@@ -25,6 +25,7 @@ func InitRouter() *gin.Engine {
 	routerGroup.userRouter()
 	routerGroup.settingsRouter()
 	routerGroup.itemRouter()
+	routerGroup.grilleRouter()
 
 	return router
 }
@@ -52,4 +53,11 @@ func (router Group) itemRouter() {
 	itemApi := api.Api.ItemApi
 	router.GET("items/:name", itemApi.ItemListView)
 	router.POST("item_create", itemApi.ItemCreateView)
+}
+
+// TODO grilleRouter 格口api的各种功能
+func (router Group) grilleRouter() {
+	grilleApi := api.Api.GrilleApi
+	router.POST("grille_form_item_create", grilleApi.GrilleFormItemCreateView)
+	router.POST("grille_create", grilleApi.GrilleCreateView)
 }

@@ -22,4 +22,8 @@ type Item struct {
 	ItemWeight      float64 `json:"itemWeight" gorm:"type:float;"`         // 商品重量
 	PackageNums     int     `json:"packageNums" gorm:"type:int(10);"`      // 包裹数量
 	LogisticsId     string  `json:"logisticsId" gorm:"type:varchar(128);"` // 订单号
+	X               float64 `json:"x" gorm:"type:float;"`
+	Y               float64 `json:"y" gorm:"type:float;"`
+	Z               float64 `json:"z" gorm:"type:float;"`
+	GrilleId        string  `json:"grille_id" gorm:"type:varchar(128);"`
 }
