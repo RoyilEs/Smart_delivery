@@ -6,6 +6,7 @@ import (
 	"Smart_delivery_locker/models/ctype"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
+	"Smart_delivery_locker/service"
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/service/user_ser"
 	"Smart_delivery_locker/utils"
@@ -189,4 +190,21 @@ func (UserApi) UserUpdatePasswordView(c *gin.Context) {
 	}
 	res.ResultOkWithMsg("密码修改成功", c)
 	return
+}
+
+func (UserApi) LogoutView(c *gin.Context) {
+	_claims, _ := c.Get("claims")
+	claims := _claims.(*jwts.CustomClaims)
+
+	token := c.Request.Header.Get("token")
+
+	err := service.ServiceApp.UserService.Logout(claims, token)
+
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("注销失败", c)
+		return
+	}
+
+	res.ResultOkWithMsg("注销成功", c)
 }
