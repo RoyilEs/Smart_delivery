@@ -23,13 +23,13 @@ func JwtAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		fmt.Println(claims)
+		fmt.Println("claims", claims)
 		// 判断是否在redis中
-		if redis_ser.CheckLogout(token) {
-			res.ResultFailWithMsg("token失效", c)
-			c.Abort()
-			return
-		}
+		//if redis_ser.CheckLogout(token) {
+		//	res.ResultFailWithMsg("token失效", c)
+		//	c.Abort()
+		//	return
+		//}
 		// 登录的用户
 		c.Set("claims", claims)
 	}

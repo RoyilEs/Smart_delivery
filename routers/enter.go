@@ -3,6 +3,7 @@ package routers
 import (
 	"Smart_delivery_locker/api"
 	"Smart_delivery_locker/global"
+	"Smart_delivery_locker/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,8 +31,11 @@ func InitRouter() *gin.Engine {
 // TODO userRouter 用户api的各种功能
 func (router Group) userRouter() {
 	userApi := api.Api.UserApi
-	router.GET("users", userApi.UserListView)
+	router.GET("users", middleware.JwtAuth(), userApi.UserListView)
 	router.POST("user_login", userApi.LoginView)
+	router.POST("user_create", userApi.UserCreateView)
+	router.DELETE("user_remove", userApi.UserRemoveView)
+	router.PUT("user_update_password", middleware.JwtAuth(), userApi.UserUpdatePasswordView)
 }
 
 func (router Group) settingsRouter() {

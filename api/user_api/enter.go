@@ -7,6 +7,7 @@ import (
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
+	"Smart_delivery_locker/service/user_ser"
 	"Smart_delivery_locker/utils"
 	"Smart_delivery_locker/utils/jwts"
 	"Smart_delivery_locker/utils/pwd"
@@ -28,9 +29,8 @@ type UserListRequest struct {
 
 func (UserApi) UserListView(c *gin.Context) {
 
-	//TODO 正式使用jwt后 断言
-	//_claims, _ := c.Get("claims")
-	//claims := _claims.(*jwts.CustomClaims)
+	_claims, _ := c.Get("claims")
+	claims := _claims.(*jwts.CustomClaims)
 
 	var page UserListRequest
 	if err := c.ShouldBind(&page); err != nil {
@@ -45,10 +45,10 @@ func (UserApi) UserListView(c *gin.Context) {
 
 	for _, user := range list {
 
-		//if ctype.Role(claims.Role) != ctype.PermissionAdmin {
-		//	//非管理员
-		//	user.Username = ""
-		//}
+		if ctype.Role(claims.Role) != ctype.PermissionAdmin {
+			//非管理员
+			user.Username = ""
+		}
 		// 脱敏
 		user.Phone = utils.DesensitizationTel(user.Phone)
 		user.Email = utils.DesensitizationEmail(user.Email)
@@ -103,4 +103,90 @@ func (UserApi) LoginView(c *gin.Context) {
 		return
 	}
 	res.ResultOK(token, fmt.Sprintf("用户%s登录成功", userModel.Username), c)
+}
+
+type UserCreateRequest struct {
+	Username   string     `json:"username" binding:"required" msg:"请输入用户名"`  //用户名
+	Email      string     `json:"email"`                                     //邮箱
+	Phone      string     `json:"phone"`                                     //手机号
+	Password   string     `json:"password" binding:"required" msg:"请输入密码"`   //密码
+	Permission ctype.Role `json:"permission" binding:"required" msg:"请选择权限"` //权限
+}
+
+func (UserApi) UserCreateView(c *gin.Context) {
+	var cr UserCreateRequest
+	if err := c.ShouldBindJSON(&cr); err != nil {
+		res.ResultFailWithError(err, &cr, c)
+		return
+	}
+	err := user_ser.UserService{}.CreateUser(cr.Username, cr.Password, cr.Permission, cr.Email, cr.Phone)
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("用户创建失败!", c)
+		return
+	}
+
+	res.ResultOkWithMsg(fmt.Sprintf("用户%s创建成功!", cr.Username), c)
+	return
+}
+
+func (UserApi) UserRemoveView(c *gin.Context) {
+	var cr models.RemoveRequest
+	err := c.ShouldBindJSON(&cr)
+	if err != nil {
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+	var userList []models.User
+	count := global.DB.Find(&userList, cr.IDList).RowsAffected
+	if count == 0 {
+		res.ResultFailWithMsg("用户不存在", c)
+		return
+	}
+	err = global.DB.Delete(&userList).Error
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("用户删除失败", c)
+		return
+	}
+	res.ResultOkWithMsg(fmt.Sprintf("成功删除%d个用户", count), c)
+}
+
+type UpdatePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required" msg:"请输入密码"`  //旧密码
+	NewPassword string `json:"new_password" binding:"required" msg:"请输入新密码"` //新密码
+}
+
+// UserUpdatePasswordView 修改登录人的密码
+func (UserApi) UserUpdatePasswordView(c *gin.Context) {
+	_claims, _ := c.Get("claims")
+	claims := _claims.(*jwts.CustomClaims)
+	fmt.Println("claims", claims)
+	// 参数绑定
+	var cr UpdatePasswordRequest
+	if err := c.ShouldBindJSON(&cr); err != nil {
+		res.ResultFailWithError(err, &cr, c)
+		return
+	}
+
+	var user models.User
+	err := global.DB.Take(&user, claims.UserID).Error
+	if err != nil {
+		res.ResultFailWithMsg("用户不存在", c)
+		return
+	}
+	// 判断密码是否一致
+	if !pwd.ComparePasswords(user.Password, cr.OldPassword) {
+		res.ResultOkWithMsg("密码错误", c)
+		return
+	}
+	hashPwd := pwd.HashPassword(cr.NewPassword)
+	err = global.DB.Model(&user).Update("password", hashPwd).Error
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("密码修改失败", c)
+		return
+	}
+	res.ResultOkWithMsg("密码修改成功", c)
+	return
 }
