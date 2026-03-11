@@ -24,6 +24,7 @@ func InitRouter() *gin.Engine {
 	routerGroup := Group{apiGroup}
 	routerGroup.userRouter()
 	routerGroup.settingsRouter()
+	routerGroup.itemRouter()
 
 	return router
 }
@@ -44,4 +45,11 @@ func (router Group) settingsRouter() {
 	router.PUT("settings", settingsApi.SettingsInfoUpdateView)
 	router.PUT("settings_jwt", settingsApi.SettingsJwtUpdateView)
 	router.PUT("settings_admin", settingsApi.SettingsAdminUpdateView)
+}
+
+// TODO itemRouter 订单api的各种功能
+func (router Group) itemRouter() {
+	itemApi := api.Api.ItemApi
+	router.GET("items/:name", itemApi.ItemListView)
+	router.POST("item_create", itemApi.ItemCreateView)
 }
