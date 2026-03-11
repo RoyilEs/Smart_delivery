@@ -31,6 +31,7 @@ func InitRouter() *gin.Engine {
 func (router Group) userRouter() {
 	userApi := api.Api.UserApi
 	router.GET("users", userApi.UserListView)
+	router.POST("user_login", userApi.LoginView)
 }
 
 func (router Group) settingsRouter() {

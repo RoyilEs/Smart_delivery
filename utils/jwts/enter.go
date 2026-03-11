@@ -11,7 +11,6 @@ import (
 // JwtPayLoad jwt中包含的payload数据
 type JwtPayLoad struct {
 	Username string `json:"username"`
-	Nickname string `json:"nickname"`
 	Role     int    `json:"role"`
 	UserID   uint   `json:"userID"`
 	Avatar   string `json:"avatar"`

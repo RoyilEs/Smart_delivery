@@ -19,6 +19,7 @@ func (SettingsApi) SettingsInfoView(c *gin.Context) {
 		res.ResultFailWithCode(CODE.ArgumentError, c)
 		return
 	}
+
 	switch cr.Name {
 	case "site":
 		res.ResultOkWithData(global.Config.SiteInfo, c)
