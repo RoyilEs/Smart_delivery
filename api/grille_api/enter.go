@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"sort"
+	"strings"
 )
 
 type GrilleApi struct{}
@@ -49,14 +50,92 @@ type GrilleConfigDTO struct {
 	BoxHeight float64 // 总体箱子高度
 }
 
+type SequenceGenerator struct {
+	used map[string]bool // 存储已使用的序号
+}
+
+func NewSequenceGenerator() *SequenceGenerator {
+	return &SequenceGenerator{
+		used: make(map[string]bool),
+	}
+}
+
+// MarkUsed 标记已经使用的序号
+func (sg *SequenceGenerator) MarkUsed(seq string) {
+	sg.used[strings.ToUpper(seq)] = true
+}
+
+// GenerateNext 生成下一个可用的序号
+func (sg *SequenceGenerator) GenerateNext() string {
+	// 从A开始查找第一个未使用的序号
+	current := 0 // 0代表A，1代表B...25代表Z，26代表AA，27代表AB...
+	for {
+		seq := numberToSequence(current)
+		if !sg.used[seq] {
+			sg.used[seq] = true // 标记为已使用
+			return seq
+		}
+		current++
+	}
+}
+
+// numberToSequence 将数字转换为序号（0->A, 25->Z, 26->AA, 27->AB...）
+func numberToSequence(num int) string {
+	var result strings.Builder
+
+	for {
+		// 计算当前位的字符：0->A, 1->B...25->Z
+		remainder := num % 26
+		result.WriteByte('A' + byte(remainder))
+
+		num = (num-remainder)/26 - 1
+		if num < 0 {
+			break
+		}
+	}
+
+	return reverseString(result.String())
+}
+
+func reverseString(s string) string {
+	runes := []rune(s)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+	return string(runes)
+}
+
 // GenerateGrilleIDs 生成格口ID列表
-func GenerateGrilleIDs(matrix []string, size int, grilleCount int) (dto []GrilleConfigDTO) {
+// 参数: matrix  矩阵总体箱子首位编号
+// 尺寸: size 尺寸大小参考 ctype.grille 中的尺寸
+// 格口数量: grilleCount  矩阵中的箱子数量
+func GenerateGrilleIDs(matrix int, size int, grilleCount int) (dto []GrilleConfigDTO) {
 	var (
 		boxCode string
+		grilles []models.Grille
+		seqs    []string
 	)
-	for _, m := range matrix {
+	// 创建序号生成器 依旧无脑责任链模式 到处拉屎
+	generator := NewSequenceGenerator()
+
+	if err := global.DB.Find(&grilles).Error; err != nil {
+		global.Log.Error("[error] 获取格口失败", err)
+		return
+	}
+	// 获取已使用的序号
+	for _, m := range grilles {
+		split := strings.Split(m.GrilleId, "_")
+		seqs = append(seqs, split[0])
+	}
+
+	for _, seq := range seqs {
+		generator.MarkUsed(seq)
+	}
+
+	for range matrix {
+		seq := generator.GenerateNext()
 		for i := range grilleCount {
-			boxCode = fmt.Sprintf("%s_%d", m, i)
+			boxCode = fmt.Sprintf("%s_%d", seq, i)
 			switch ctype.Size(size) {
 			case ctype.SizeSmall:
 				dto = append(dto, GrilleConfigDTO{
@@ -133,6 +212,7 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 			// 成功则适配 检索下一个 放入表中
 			if flag {
 				global.DB.Model(&grilles[count]).Update("logistics_id", item.LogisticsId)
+				global.DB.Model(&items[count]).Update("grille_id", grilles[count].GrilleId)
 				count++
 				break
 			}
@@ -142,9 +222,9 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 }
 
 type GrilleCreateRequest struct {
-	Matrix []string `json:"matrix"`
-	Size   int      `json:"size"`
-	Count  int      `json:"count"`
+	Matrix int `json:"matrix"`
+	Size   int `json:"size"`
+	Count  int `json:"count"`
 }
 
 func (GrilleApi) GrilleCreateView(c *gin.Context) {
