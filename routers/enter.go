@@ -60,4 +60,5 @@ func (router Group) grilleRouter() {
 	grilleApi := api.Api.GrilleApi
 	router.POST("grille_form_item_create", grilleApi.GrilleFormItemCreateView)
 	router.POST("grille_create", grilleApi.GrilleCreateView)
+	router.POST("item_out_grille", grilleApi.ItemOutGrilleView)
 }

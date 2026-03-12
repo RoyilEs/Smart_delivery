@@ -5,6 +5,7 @@ import (
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
 	"Smart_delivery_locker/models/res"
+	"Smart_delivery_locker/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"sort"
@@ -194,6 +195,14 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 		items = append(items, item)
 	}
 
+	for _, item := range items {
+		if item.GrilleId != "" {
+			newItem := utils.DeleteByValue(items, item)
+			items = newItem
+			global.Log.Printf("%s存在在格口中已剔除", item.LogisticsId)
+		}
+	}
+
 	// 获取空格口
 	var grilles []models.Grille
 	if err := global.DB.Find(&grilles, "logistics_id = ?", "").Error; err != nil {
@@ -227,6 +236,7 @@ type GrilleCreateRequest struct {
 	Count  int `json:"count"`
 }
 
+// GrilleCreateView 创建格口
 func (GrilleApi) GrilleCreateView(c *gin.Context) {
 	var cr GrilleCreateRequest
 	if err := c.ShouldBindJSON(&cr); err != nil {
@@ -246,4 +256,44 @@ func (GrilleApi) GrilleCreateView(c *gin.Context) {
 		global.DB.Create(&grilleModel)
 	}
 	res.ResultOkWithMsg("格口创建成功!", c)
+}
+
+type ItemOutGrilleRequest struct {
+	LogisticsId []string `json:"logistics_ids"`
+}
+
+// ItemOutGrilleView 订单出格口
+func (GrilleApi) ItemOutGrilleView(c *gin.Context) {
+	var (
+		cr      ItemOutGrilleRequest
+		items   []models.Item
+		grilles []models.Grille
+	)
+	if err := c.ShouldBindJSON(&cr); err != nil {
+		res.ResultFailWithError(err, &cr, c)
+		return
+	}
+	for _, id := range cr.LogisticsId {
+		var (
+			item   models.Item
+			grille models.Grille
+		)
+		if err := global.DB.Find(&item, "logistics_id = ?", id); err != nil {
+			res.ResultFailWithMsg("订单不存在", c)
+			return
+		}
+		if err := global.DB.Find(&grille, "logistics_id = ?", id); err != nil {
+			res.ResultFailWithMsg("订单不在格口中", c)
+			return
+		}
+		items = append(items, item)
+		grilles = append(grilles, grille)
+	}
+
+	// 出库操作
+	for i, item := range items {
+		global.DB.Model(&item).Update("grille_id", "")
+		global.DB.Model(&grilles[i]).Update("logistics_id", "")
+	}
+	res.ResultOK(cr, "出库成功", c)
 }

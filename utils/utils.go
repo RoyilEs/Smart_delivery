@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"Smart_delivery_locker/global"
 	"crypto/md5"
 	"encoding/hex"
 	"github.com/go-playground/validator/v10"
@@ -65,4 +66,48 @@ func DesensitizationEmail(email string) string {
 
 func Random(min, max int) int {
 	return rand.Intn(max-min) + min
+}
+
+// DeleteByIndex 删除指定索引的元素（高效，O(1)，但会改变原切片顺序）
+func DeleteByIndex[T any](slice []T, index int) []T {
+	// 索引合法性检查
+	if index < 0 || index >= len(slice) {
+		global.Log.Warn("索引越界，返回原切片")
+		return slice
+	}
+	// 用最后一个元素覆盖目标索引，截断末尾
+	slice[index] = slice[len(slice)-1]
+	return slice[:len(slice)-1]
+}
+
+// DeleteByIndexKeepOrder 删除指定索引的元素（保持顺序，O(n)）
+func DeleteByIndexKeepOrder[T any](slice []T, index int) []T {
+	if index < 0 || index >= len(slice) {
+		global.Log.Warn("索引越界，返回原切片")
+		return slice
+	}
+	// 拼接前后切片，保持顺序
+	return append(slice[:index], slice[index+1:]...)
+}
+
+// DeleteByValue 删除指定值的元素（删除所有匹配项）
+func DeleteByValue[T comparable](slice []T, value T) []T {
+	newSlice := make([]T, 0, len(slice)) // 预分配容量
+	for _, v := range slice {
+		if v != value {
+			newSlice = append(newSlice, v)
+		}
+	}
+	return newSlice
+}
+
+// DeleteByCondition 按条件删除元素（通用方法）
+func DeleteByCondition[T any](slice []T, condition func(T) bool) []T {
+	newSlice := make([]T, 0, len(slice))
+	for _, v := range slice {
+		if !condition(v) { // 保留不满足删除条件的元素
+			newSlice = append(newSlice, v)
+		}
+	}
+	return newSlice
 }
