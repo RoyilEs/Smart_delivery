@@ -259,7 +259,7 @@ func (GrilleApi) GrilleCreateView(c *gin.Context) {
 }
 
 type ItemOutGrilleRequest struct {
-	LogisticsId []string `json:"logistics_ids"`
+	LogisticsIds []string `json:"logistics_ids"`
 }
 
 // ItemOutGrilleView 订单出格口
@@ -273,16 +273,14 @@ func (GrilleApi) ItemOutGrilleView(c *gin.Context) {
 		res.ResultFailWithError(err, &cr, c)
 		return
 	}
-	for _, id := range cr.LogisticsId {
-		var (
-			item   models.Item
-			grille models.Grille
-		)
-		if err := global.DB.Find(&item, "logistics_id = ?", id); err != nil {
+	for _, id := range cr.LogisticsIds {
+		item := models.Item{}
+		grille := models.Grille{}
+		if err := global.DB.Find(&item, "logistics_id = ?", id).Error; err != nil {
 			res.ResultFailWithMsg("订单不存在", c)
 			return
 		}
-		if err := global.DB.Find(&grille, "logistics_id = ?", id); err != nil {
+		if err := global.DB.Find(&grille, "logistics_id = ?", id).Error; err != nil {
 			res.ResultFailWithMsg("订单不在格口中", c)
 			return
 		}
@@ -295,5 +293,14 @@ func (GrilleApi) ItemOutGrilleView(c *gin.Context) {
 		global.DB.Model(&item).Update("grille_id", "")
 		global.DB.Model(&grilles[i]).Update("logistics_id", "")
 	}
+
+	// TODO 测试阶段不做删除
+	//err := global.DB.Delete(&items).Error
+	//if err != nil {
+	//	global.Log.Error("[error] 出库失败", err)
+	//	res.ResultFailWithMsg("出库失败", c)\
+	//	return
+	//}
+
 	res.ResultOK(cr, "出库成功", c)
 }
