@@ -192,6 +192,7 @@ func (UserApi) UserUpdatePasswordView(c *gin.Context) {
 	return
 }
 
+// LogoutView 登出
 func (UserApi) LogoutView(c *gin.Context) {
 	_claims, _ := c.Get("claims")
 	claims := _claims.(*jwts.CustomClaims)

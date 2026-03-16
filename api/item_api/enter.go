@@ -63,7 +63,7 @@ func (ItemApi) ItemListView(c *gin.Context) {
 				items = append(items, ItemResponse{
 					Item: item,
 				})
-				count += 1
+				count++
 			}
 		}
 	}
@@ -77,6 +77,44 @@ func (ItemApi) ItemListView(c *gin.Context) {
 			items = append(items, ItemResponse{
 				Item: item,
 			})
+		}
+	}
+	res.ResultOkWithList(items, count, c)
+}
+
+// ItemUserListView 针对用户界面的包裹查询(不论何种权限)
+func (ItemApi) ItemUserListView(c *gin.Context) {
+	var cr ItemUri
+	if err := c.ShouldBindUri(&cr); err != nil {
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+
+	var page ItemListRequest
+	if err := c.ShouldBind(&page); err != nil {
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+
+	var userModel models.User
+	err := global.DB.Where("username = ?", cr.Name).Find(&userModel).Error
+	if err != nil {
+		res.ResultFailWithMsg("用户不存在", c)
+		return
+	}
+
+	var (
+		items []ItemResponse
+		count int64
+	)
+	list, _, _ := common.ComList(models.Item{SenderName: userModel.Username}, common.Option{
+		PageInfo: page.PageInfo})
+
+	for _, item := range list {
+		if item.SenderName == userModel.Username {
+			items = append(items, ItemResponse{
+				Item: item})
+			count += 1
 		}
 	}
 	res.ResultOkWithList(items, count, c)

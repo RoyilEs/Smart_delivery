@@ -5,6 +5,8 @@ import (
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
 	"Smart_delivery_locker/models/res"
+	CODE "Smart_delivery_locker/models/res/code"
+	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -303,4 +305,69 @@ func (GrilleApi) ItemOutGrilleView(c *gin.Context) {
 	//}
 
 	res.ResultOK(cr, "出库成功", c)
+}
+
+// PhoneUri 获取包裹信息
+type PhoneUri struct {
+	Phone string `uri:"phone"`
+}
+
+type ItemResponse struct {
+	models.Item
+}
+
+type ItemListRequest struct {
+	models.PageInfo
+}
+
+// PhoneGetItemsView 通过手机号获取已入库的订单
+func (GrilleApi) PhoneGetItemsView(c *gin.Context) {
+	var cr PhoneUri
+	if err := c.ShouldBindUri(&cr); err != nil {
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+
+	var page ItemListRequest
+	if err := c.ShouldBind(&page); err != nil {
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+
+	var (
+		userModel models.User
+		total     int64
+	)
+	global.DB.Where("phone = ?", cr.Phone).Find(&userModel).Count(&total)
+	if total == 0 {
+		res.ResultFailWithMsg("用户不存在", c)
+		return
+	}
+	fmt.Println(userModel)
+	var (
+		items        []ItemResponse
+		count        int64
+		setGrilleNum int64
+	)
+
+	list, _, _ := common.ComList(models.Item{SenderPhone: userModel.Phone}, common.Option{
+		PageInfo: page.PageInfo,
+	})
+	fmt.Println(len(list))
+	for _, item := range list {
+		if item.SenderPhone == userModel.Phone {
+			items = append(items, ItemResponse{
+				Item: item,
+			})
+			count++
+		}
+	}
+
+	for _, item := range items {
+		if item.GrilleId == "" {
+			setGrilleNum++
+		}
+	}
+
+	res.ResultOkWithListMsg(items, count, fmt.Sprintf("%d个包裹未放入格口", setGrilleNum), c)
 }

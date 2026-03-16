@@ -52,6 +52,7 @@ func (router Group) settingsRouter() {
 func (router Group) itemRouter() {
 	itemApi := api.Api.ItemApi
 	router.GET("items/:name", itemApi.ItemListView)
+	router.GET("user_items/:name", itemApi.ItemUserListView)
 	router.POST("item_create", itemApi.ItemCreateView)
 }
 
@@ -61,4 +62,5 @@ func (router Group) grilleRouter() {
 	router.POST("grille_form_item_create", grilleApi.GrilleFormItemCreateView)
 	router.POST("grille_create", grilleApi.GrilleCreateView)
 	router.POST("item_out_grille", grilleApi.ItemOutGrilleView)
+	router.GET("grille_phone_get_item/:phone", grilleApi.PhoneGetItemsView)
 }
