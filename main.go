@@ -23,7 +23,7 @@ func main() {
 
 	router := routers.InitRouter()
 	err := router.Run(global.Config.System.Addr())
-	if err != nil {
+	if err == nil {
 		global.Log.Error("启动失败")
 	}
 	global.Log.Infof("启动成功:: %s", global.Config.System.Addr())

@@ -67,6 +67,17 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required" msg:"请输入密码"`
 }
 
+type LoginDataResponse struct {
+	Token      string     `json:"token"`
+	UserID     uint       `json:"user_id"`
+	UserName   string     `json:"username"`
+	NickName   string     `json:"nick_name"`
+	Phone      string     `json:"phone"`
+	Role       ctype.Role `json:"role"`
+	Permission int        `json:"permission"`
+	Status     string     `json:"status"`
+}
+
 func (UserApi) LoginView(c *gin.Context) {
 	var cr LoginRequest
 	err := c.ShouldBindJSON(&cr)
@@ -82,7 +93,6 @@ func (UserApi) LoginView(c *gin.Context) {
 		res.ResultFailWithMsg("用户不存在", c)
 		return
 	}
-
 	// 密码验证
 	ok := pwd.ComparePasswords(userModel.Password, cr.Password)
 	if !ok {
@@ -98,12 +108,23 @@ func (UserApi) LoginView(c *gin.Context) {
 		UserID:   userModel.ID,
 		Avatar:   userModel.Avatar,
 	})
+
+	loginData := LoginDataResponse{
+		Token:      token,
+		UserID:     userModel.ID,
+		UserName:   userModel.Username,
+		NickName:   userModel.Username, //TODO 获取昵称
+		Phone:      userModel.Phone,
+		Role:       userModel.Permission,
+		Permission: int(userModel.Permission),
+		Status:     userModel.Status,
+	}
 	if err != nil {
 		global.Log.Error("token生成失败", err)
 		res.ResultFailWithMsg("token生成失败", c)
 		return
 	}
-	res.ResultOK(token, fmt.Sprintf("用户%s登录成功", userModel.Username), c)
+	res.ResultOK(loginData, fmt.Sprintf("用户%s登录成功", userModel.Username), c)
 }
 
 type UserCreateRequest struct {

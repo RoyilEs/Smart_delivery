@@ -42,10 +42,10 @@ func (router Group) userRouter() {
 
 func (router Group) settingsRouter() {
 	settingsApi := api.Api.SettingsApi
-	router.GET("settings/:name", settingsApi.SettingsInfoView)
-	router.PUT("settings", settingsApi.SettingsInfoUpdateView)
-	router.PUT("settings_jwt", settingsApi.SettingsJwtUpdateView)
-	router.PUT("settings_admin", settingsApi.SettingsAdminUpdateView)
+	router.GET("settings/:name", middleware.JwtAdmin(), settingsApi.SettingsInfoView)
+	router.PUT("settings", middleware.JwtAdmin(), settingsApi.SettingsInfoUpdateView)
+	router.PUT("settings_jwt", middleware.JwtAdmin(), settingsApi.SettingsJwtUpdateView)
+	router.PUT("settings_admin", middleware.JwtAdmin(), settingsApi.SettingsAdminUpdateView)
 }
 
 // TODO itemRouter 订单api的各种功能
