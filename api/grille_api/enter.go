@@ -178,6 +178,11 @@ type GrilleFormItemCreateRequest struct {
 	LogisticsIds []string `json:"logistics_ids"`
 }
 
+type GrilleFormItemCreateResponse struct {
+	Count int           `json:"count"`
+	Items []models.Item `json:"list"`
+}
+
 // GrilleFormItemCreateView 通过订单ID创建格口
 func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 	var (
@@ -235,18 +240,32 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 		global.DB.Find(&item, "logistics_id = ?", in.LogisticsId)
 		inItems = append(inItems, item)
 	}
-	res.ResultOK(inItems, fmt.Sprintf("成功放入 %d 个订单", count), c)
+
+	res.ResultOK(GrilleFormItemCreateResponse{
+		Count: count,
+		Items: inItems,
+	}, fmt.Sprintf("成功放入 %d 个订单", count), c)
 }
 
 type GrilleCreateRequest struct {
-	Matrix int `json:"matrix"`
-	Size   int `json:"size"`
-	Count  int `json:"count"`
+	Matrix int    `json:"matrix"`
+	Size   int    `json:"size"`
+	Count  int    `json:"count"`
+	Remark string `json:"remark"`
+}
+
+type GrilleCreateResponse struct {
+	Count   int             `json:"count"`
+	Grilles []models.Grille `json:"list"`
 }
 
 // GrilleCreateView 创建格口
 func (GrilleApi) GrilleCreateView(c *gin.Context) {
-	var cr GrilleCreateRequest
+	var (
+		cr        GrilleCreateRequest
+		count     int
+		newGrille []models.Grille
+	)
 	if err := c.ShouldBindJSON(&cr); err != nil {
 		res.ResultFailWithError(err, &cr, c)
 		return
@@ -262,8 +281,17 @@ func (GrilleApi) GrilleCreateView(c *gin.Context) {
 			Size:     ctype.Size(cr.Size),
 		}
 		global.DB.Create(&grilleModel)
+		count++
 	}
-	res.ResultOkWithMsg("格口创建成功!", c)
+	for _, grille := range grilles {
+		grilleModel := models.Grille{}
+		global.DB.Find(&grilleModel, "grille_id = ?", grille.BoxCode)
+		newGrille = append(newGrille, grilleModel)
+	}
+	res.ResultOK(GrilleCreateResponse{
+		Count:   count,
+		Grilles: newGrille,
+	}, fmt.Sprintf("成功创建 %d 个格口", count), c)
 }
 
 type ItemOutGrilleRequest struct {
