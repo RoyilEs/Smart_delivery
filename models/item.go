@@ -27,7 +27,7 @@ type Item struct {
 	Z               float64 `json:"z" gorm:"type:float;"`
 	GrilleId        string  `json:"grille_id" gorm:"type:varchar(128);"`
 
-	PickupCOde string `json:"pickup_code" gorm:"type:varchar(128);"` // 取件码
+	PickupCode string `json:"pickup_code" gorm:"type:varchar(128);"` // 取件码
 	Status     string `json:"status" gorm:"type:varchar(128);"`      // 包裹状态
 
 	CabinetId   string `json:"cabinet_id" gorm:"type:varchar(128);"`   // 柜体ID
