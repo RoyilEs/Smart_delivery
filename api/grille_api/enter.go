@@ -181,8 +181,9 @@ type GrilleFormItemCreateRequest struct {
 // GrilleFormItemCreateView 通过订单ID创建格口
 func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 	var (
-		cr    GrilleFormItemCreateRequest
-		count int
+		cr      GrilleFormItemCreateRequest
+		count   int
+		inItems []models.Item
 	)
 	if err := c.ShouldBindJSON(&cr); err != nil {
 		res.ResultFailWithError(err, &cr, c)
@@ -229,7 +230,12 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 			}
 		}
 	}
-	res.ResultOkWithMsg(fmt.Sprintf("成功放入 %d 个订单", count), c)
+	for _, in := range items {
+		item := models.Item{}
+		global.DB.Find(&item, "logistics_id = ?", in.LogisticsId)
+		inItems = append(inItems, item)
+	}
+	res.ResultOK(inItems, fmt.Sprintf("成功放入 %d 个订单", count), c)
 }
 
 type GrilleCreateRequest struct {
