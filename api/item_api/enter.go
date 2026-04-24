@@ -202,5 +202,5 @@ func (ItemApi) ItemCreateView(c *gin.Context) {
 		res.ResultFailWithMsg("包裹创建失败!", c)
 		return
 	}
-	res.ResultOkWithMsg("包裹创建成功!", c)
+	res.ResultOK(item, "包裹创建成功!", c)
 }

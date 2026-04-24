@@ -19,6 +19,7 @@ func Makemigrations() {
 			&models.User{},
 			&models.Item{},
 			&models.Grille{},
+			&models.Package{},
 		)
 	if err != nil {
 		global.Log.Error("[error] 生成数据库表结构失败", err)

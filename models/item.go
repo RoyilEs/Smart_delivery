@@ -26,4 +26,16 @@ type Item struct {
 	Y               float64 `json:"y" gorm:"type:float;"`
 	Z               float64 `json:"z" gorm:"type:float;"`
 	GrilleId        string  `json:"grille_id" gorm:"type:varchar(128);"`
+
+	PickupCOde string `json:"pickup_code" gorm:"type:varchar(128);"` // 取件码
+	Status     string `json:"status" gorm:"type:varchar(128);"`      // 包裹状态
+
+	CabinetId   string `json:"cabinet_id" gorm:"type:varchar(128);"`   // 柜体ID
+	CabinetCode string `json:"cabinet_code" gorm:"type:varchar(128);"` // 柜体名称
+
+	GrilleStatus  string `json:"grille_status" gorm:"type:varchar(128);"` // 当前格口状态
+	InboundAt     string `json:"inbound_at" gorm:"type:varchar(128);"`    // 入柜时间
+	OutboundAt    string `json:"outbound_at" gorm:"type:varchar(128);"`   // 出柜时间
+	Remark        string `json:"remark" gorm:"type:varchar(128);"`        // 备注
+	ReceiverToken string `json:"receiver_token" gorm:"type:varchar(128);"`
 }
