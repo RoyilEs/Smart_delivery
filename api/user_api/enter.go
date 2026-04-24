@@ -14,6 +14,7 @@ import (
 	"Smart_delivery_locker/utils/pwd"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"time"
 )
 
 type UserApi struct{}
@@ -68,7 +69,11 @@ type LoginRequest struct {
 }
 
 type LoginDataResponse struct {
-	Token      string     `json:"token"`
+	Token   string       `json:"token"`
+	Profile LoginProfile `json:"profile"`
+}
+
+type LoginProfile struct {
 	UserID     uint       `json:"user_id"`
 	UserName   string     `json:"username"`
 	NickName   string     `json:"nick_name"`
@@ -109,16 +114,31 @@ func (UserApi) LoginView(c *gin.Context) {
 		Avatar:   userModel.Avatar,
 	})
 
-	loginData := LoginDataResponse{
-		Token:      token,
+	if err := global.DB.Model(&userModel).Update("token", token).Error; err != nil {
+		global.Log.Error("更新Token失败", err)
+	}
+
+	profile := LoginProfile{
 		UserID:     userModel.ID,
 		UserName:   userModel.Username,
-		NickName:   userModel.Username, //TODO 获取昵称
+		NickName:   userModel.Username,
 		Phone:      userModel.Phone,
 		Role:       userModel.Permission,
 		Permission: int(userModel.Permission),
 		Status:     userModel.Status,
 	}
+
+	loginData := LoginDataResponse{
+		Token:   token,
+		Profile: profile,
+	}
+
+	now := time.Now()
+	isoStr := utils.ToISO8601(now)
+	if err := global.DB.Model(&userModel).Update("last_login_at", isoStr).Error; err != nil {
+		global.Log.Error("更新用户登录时间失败", err)
+	}
+
 	if err != nil {
 		global.Log.Error("token生成失败", err)
 		res.ResultFailWithMsg("token生成失败", c)

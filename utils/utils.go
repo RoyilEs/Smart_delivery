@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // InList 是否存在列表里面
@@ -110,4 +111,8 @@ func DeleteByCondition[T any](slice []T, condition func(T) bool) []T {
 		}
 	}
 	return newSlice
+}
+
+func ToISO8601(t time.Time) string {
+	return t.UTC().Format("2006-01-02T15:04:05.000Z")
 }

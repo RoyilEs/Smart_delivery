@@ -5,6 +5,7 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/middleware"
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 type Group struct {
@@ -14,6 +15,7 @@ type Group struct {
 func InitRouter() *gin.Engine {
 	gin.SetMode(global.Config.System.Env)
 	router := gin.Default()
+	router.Use(Cors())
 
 	router.GET("", func(c *gin.Context) {
 		c.String(200, "XXX")
@@ -63,4 +65,23 @@ func (router Group) grilleRouter() {
 	router.POST("grille_create", grilleApi.GrilleCreateView)
 	router.POST("item_out_grille", grilleApi.ItemOutGrilleView)
 	router.GET("grille_phone_get_item/:phone", grilleApi.PhoneGetItemsView)
+}
+
+// Cors 跨域中间件
+func Cors() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 允许前端localhost:5173
+		c.Header("Access-Control-Allow-Origin", "http://localhost:5173")
+		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH")
+		// 必须放行你所有自定义请求头！
+		c.Header("Access-Control-Allow-Headers", "Content-Type,token,Authorization,X-User-Scene")
+		c.Header("Access-Control-Allow-Credentials", "true")
+
+		// 预检OPTIONS请求直接放行200
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusOK)
+			return
+		}
+		c.Next()
+	}
 }

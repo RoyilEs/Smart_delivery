@@ -19,13 +19,13 @@ func (r Role) String() interface{} {
 	var str string
 	switch r {
 	case PermissionAdmin:
-		str = "管理员"
+		str = "admin"
 	case PermissionUser:
-		str = "用户"
+		str = "user"
 	case PermissionCourier:
-		str = "快递员"
+		str = "courier"
 	case PermissionDisableUser:
-		str = "被禁用"
+		str = "outer"
 	default:
 		str = "未知"
 	}
