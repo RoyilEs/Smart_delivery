@@ -251,6 +251,41 @@ func (UserApi) UserRemoveView(c *gin.Context) {
 	res.ResultOkWithMsg(fmt.Sprintf("成功删除%d个用户", count), c)
 }
 
+type UpdateUserUri struct {
+	ID uint `json:"id"`
+}
+
+func (UserApi) UserUpdateView(c *gin.Context) {
+	_claims, _ := c.Get("claims")
+	claims := _claims.(*jwts.CustomClaims)
+
+	var cr UpdateUserUri
+	err := c.ShouldBindUri(&cr)
+	if err != nil {
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+	var userModel models.User
+	// 本人操作
+	err = global.DB.Take(&userModel, claims.UserID).Error
+	if err != nil {
+		res.ResultFailWithMsg("用户不存在", c)
+		return
+	}
+	// 同ID 或者 管理员操作
+	if cr.ID == claims.UserID || ctype.PermissionAdmin == ctype.Role(claims.Role) {
+		err = global.DB.Model(userModel).Where("id = ?", cr.ID).Updates(userModel).Error
+		if err != nil {
+			global.Log.Error(err)
+			res.ResultFailWithMsg("修改失败", c)
+			return
+		}
+		global.DB.Find(&userModel, "id = ?", cr.ID)
+		userModel.Password = ""
+		res.ResultOkWithData(userModel, c)
+	}
+}
+
 type UpdatePasswordRequest struct {
 	OldPassword string `json:"old_password" binding:"required" msg:"请输入密码"`  //旧密码
 	NewPassword string `json:"new_password" binding:"required" msg:"请输入新密码"` //新密码
