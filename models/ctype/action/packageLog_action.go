@@ -1,6 +1,8 @@
 package action
 
-import "github.com/goccy/go-json"
+import (
+	"github.com/goccy/go-json"
+)
 
 type PackageAction int
 

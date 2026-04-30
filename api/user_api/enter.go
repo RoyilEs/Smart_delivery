@@ -4,6 +4,7 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service"
@@ -13,8 +14,9 @@ import (
 	"Smart_delivery_locker/utils/jwts"
 	"Smart_delivery_locker/utils/pwd"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type UserApi struct{}
@@ -155,6 +157,7 @@ type UserCreateRequest struct {
 	Permission ctype.Role `json:"permission" binding:"required" msg:"请选择权限"` //权限
 }
 
+// UserCreateView 控制台方面的用户建立
 func (UserApi) UserCreateView(c *gin.Context) {
 	var cr UserCreateRequest
 	if err := c.ShouldBindJSON(&cr); err != nil {
@@ -170,6 +173,60 @@ func (UserApi) UserCreateView(c *gin.Context) {
 
 	res.ResultOkWithMsg(fmt.Sprintf("用户%s创建成功!", cr.Username), c)
 	return
+}
+
+type UserCreateWebRequest struct {
+	Username string            `json:"username"` //	是	账号
+	Nickname string            `json:"nickname"` //	是	昵称
+	Phone    string            `json:"phone"`    //是	手机号
+	Email    string            `json:"email"`    //是	邮箱
+	Role     ctype.Role        `json:"role"`     //是	admin / courier / user
+	Status   status.UserStatus `json:"status"`   //是	enabled / disabled
+	Password string            `json:"password"` //是	初始密码
+	Avatar   string            `json:"avatar"`   //否	头像
+}
+
+// UsersCreateFormWebView Web方面的用户建立
+func (UserApi) UsersCreateFormWebView(c *gin.Context) {
+	var cr UserCreateWebRequest
+	if err := c.ShouldBindJSON(&cr); err != nil {
+		res.ResultFailWithError(err, &cr, c)
+	}
+
+	// 寻找是否存在手机号相同用户
+	var userModel models.User
+	err := global.DB.Take(&userModel, "phone = ?", cr.Phone).Error
+	if err != nil {
+		global.Log.Warn("用户已存在，请重新输入")
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+	hashPassword := pwd.HashPassword(cr.Password)
+
+	err = global.DB.Create(&models.User{
+		Username:   cr.Username,
+		Nickname:   cr.Nickname,
+		Phone:      cr.Phone,
+		Email:      cr.Email,
+		Password:   hashPassword,
+		Avatar:     cr.Avatar,
+		Status:     cr.Status.String(),
+		Permission: cr.Role,
+	}).Error
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("角色创建失败", c)
+		return
+	}
+
+	err = global.DB.Find(&userModel, "phone = ?", cr.Phone).Error
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+	userModel.Password = "" // 不返回密码
+	res.ResultOkWithData(userModel, c)
 }
 
 func (UserApi) UserRemoveView(c *gin.Context) {

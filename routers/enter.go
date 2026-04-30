@@ -4,8 +4,9 @@ import (
 	"Smart_delivery_locker/api"
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/middleware"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Group struct {
@@ -38,6 +39,7 @@ func (router Group) userRouter() {
 	router.GET("users", middleware.JwtAuth(), userApi.UserListView)
 	router.POST("user_login", userApi.LoginView)
 	router.POST("user_create", userApi.UserCreateView)
+	router.POST("users", userApi.UsersCreateFormWebView) // 区分命令行建立用户 此处检测Phone的差别
 	router.DELETE("user_remove", userApi.UserRemoveView)
 	router.PUT("user_update_password", middleware.JwtAuth(), userApi.UserUpdatePasswordView)
 }
