@@ -254,6 +254,31 @@ func (UserApi) UserRemoveView(c *gin.Context) {
 	res.ResultOkWithMsg(fmt.Sprintf("成功删除%d个用户", count), c)
 }
 
+// UserDeleteView 删除用户 这里做单独删除
+func (UserApi) UserDeleteView(c *gin.Context) {
+	_claims, _ := c.Get("claims")
+	claims := _claims.(*jwts.CustomClaims)
+
+	id := c.Param("id")
+	if ctype.Role(claims.Role) != ctype.PermissionAdmin {
+		res.ResultFailWithMsg("无权限", c)
+		return
+	}
+	var userModel models.User
+	count := global.DB.Find(&userModel, id).RowsAffected
+	if count == 0 {
+		res.ResultFailWithMsg("用户不存在", c)
+		return
+	}
+	err := global.DB.Delete(&userModel).Error
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("用户删除失败", c)
+		return
+	}
+	res.ResultOkWithMsg(fmt.Sprintf("用户%s删除成功", userModel.Username), c)
+}
+
 type UpdateUserRequest struct {
 	Username string     `json:"username"` //	是	账号
 	Nickname string     `json:"nickname"` //	是	昵称
@@ -334,6 +359,25 @@ func (UserApi) UserUpdatePasswordView(c *gin.Context) {
 	}
 	res.ResultOkWithMsg("密码修改成功", c)
 	return
+}
+
+// ResetPasswordView 重置密码
+func (UserApi) ResetPasswordView(c *gin.Context) {
+	id := c.Param("id")
+	var user models.User
+	err := global.DB.Take(&user, id).Error
+	if err != nil {
+		res.ResultFailWithMsg("用户不存在", c)
+		return
+	}
+	hashPwd := pwd.HashPassword("123456")
+	err = global.DB.Model(&user).Update("password", hashPwd).Error
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("密码修改失败", c)
+		return
+	}
+	res.ResultOkWithMsg("密码修改成功", c)
 }
 
 // LogoutView 登出

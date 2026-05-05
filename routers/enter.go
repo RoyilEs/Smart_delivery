@@ -41,7 +41,9 @@ func (router Group) userRouter() {
 	router.POST("user_create", userApi.UserCreateView)
 	router.POST("users", userApi.UsersCreateFormWebView) // 区分命令行建立用户 此处检测Phone的差别
 	router.DELETE("user_remove", userApi.UserRemoveView)
+	router.DELETE("users/:id", middleware.JwtAdmin(), userApi.UserDeleteView)
 	router.PUT("user_update_password", middleware.JwtAuth(), userApi.UserUpdatePasswordView)
+	router.PUT("users/:id/reset_password", userApi.ResetPasswordView)
 	router.PUT("users/:id", middleware.JwtAuth(), userApi.UserUpdateView)
 }
 
