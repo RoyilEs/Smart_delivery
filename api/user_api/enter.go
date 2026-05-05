@@ -13,7 +13,9 @@ import (
 	"Smart_delivery_locker/utils"
 	"Smart_delivery_locker/utils/jwts"
 	"Smart_delivery_locker/utils/pwd"
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -176,14 +178,14 @@ func (UserApi) UserCreateView(c *gin.Context) {
 }
 
 type UserCreateWebRequest struct {
-	Username string            `json:"username"` //	是	账号
-	Nickname string            `json:"nickname"` //	是	昵称
-	Phone    string            `json:"phone"`    //是	手机号
-	Email    string            `json:"email"`    //是	邮箱
-	Role     ctype.Role        `json:"role"`     //是	admin / courier / user
-	Status   status.UserStatus `json:"status"`   //是	enabled / disabled
-	Password string            `json:"password"` //是	初始密码
-	Avatar   string            `json:"avatar"`   //否	头像
+	Username string     `json:"username"` //	是	账号
+	Nickname string     `json:"nickname"` //	是	昵称
+	Phone    string     `json:"phone"`    //是	手机号
+	Email    string     `json:"email"`    //是	邮箱
+	Role     ctype.Role `json:"role"`     //是	admin / courier / user
+	Status   string     `json:"status"`   //是	enabled / disabled
+	Password string     `json:"password"` //是	初始密码
+	Avatar   string     `json:"avatar"`   //否	头像
 }
 
 // UsersCreateFormWebView Web方面的用户建立
@@ -196,13 +198,13 @@ func (UserApi) UsersCreateFormWebView(c *gin.Context) {
 	// 寻找是否存在手机号相同用户
 	var userModel models.User
 	err := global.DB.Take(&userModel, "phone = ?", cr.Phone).Error
-	if err != nil {
-		global.Log.Warn("用户已存在，请重新输入")
-		res.ResultFailWithCode(CODE.ArgumentError, c)
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		global.Log.Warn("手机号已存在")
+		res.ResultFailWithMsg("手机号已存在", c)
 		return
 	}
-	hashPassword := pwd.HashPassword(cr.Password)
 
+	hashPassword := pwd.HashPassword(cr.Password)
 	err = global.DB.Create(&models.User{
 		Username:   cr.Username,
 		Nickname:   cr.Nickname,
@@ -210,7 +212,7 @@ func (UserApi) UsersCreateFormWebView(c *gin.Context) {
 		Email:      cr.Email,
 		Password:   hashPassword,
 		Avatar:     cr.Avatar,
-		Status:     cr.Status.String(),
+		Status:     status.Enabled.String(),
 		Permission: cr.Role,
 	}).Error
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
@@ -279,6 +280,7 @@ func (GrilleApi) GrilleCreateView(c *gin.Context) {
 			Y:        grille.BoxWidth,
 			Z:        grille.BoxHeight,
 			Size:     ctype.Size(cr.Size),
+			Status:   status.Idle.String(),
 		}
 		global.DB.Create(&grilleModel)
 		count++
