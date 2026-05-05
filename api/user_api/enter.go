@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"gorm.io/gorm"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -253,36 +254,44 @@ func (UserApi) UserRemoveView(c *gin.Context) {
 	res.ResultOkWithMsg(fmt.Sprintf("成功删除%d个用户", count), c)
 }
 
-type UpdateUserUri struct {
-	ID uint `json:"id"`
+type UpdateUserRequest struct {
+	Username string     `json:"username"` //	是	账号
+	Nickname string     `json:"nickname"` //	是	昵称
+	Phone    string     `json:"phone"`    //是	手机号
+	Email    string     `json:"email"`    //是	邮箱
+	Role     ctype.Role `json:"role"`     //是	admin / courier / user
+	Status   string     `json:"status"`   //是	enabled / disabled
 }
 
 func (UserApi) UserUpdateView(c *gin.Context) {
 	_claims, _ := c.Get("claims")
 	claims := _claims.(*jwts.CustomClaims)
 
-	var cr UpdateUserUri
-	err := c.ShouldBindUri(&cr)
-	if err != nil {
-		res.ResultFailWithCode(CODE.ArgumentError, c)
+	id := c.Param("id")
+
+	var req UpdateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.ResultFailWithError(err, &req, c)
 		return
 	}
+
 	var userModel models.User
 	// 本人操作
-	err = global.DB.Take(&userModel, claims.UserID).Error
+	err := global.DB.Take(&userModel, id).Error
 	if err != nil {
 		res.ResultFailWithMsg("用户不存在", c)
 		return
 	}
+	idi, _ := strconv.Atoi(id)
 	// 同ID 或者 管理员操作
-	if cr.ID == claims.UserID || ctype.PermissionAdmin == ctype.Role(claims.Role) {
-		err = global.DB.Model(userModel).Where("id = ?", cr.ID).Updates(userModel).Error
+	if uint(idi) == claims.UserID || ctype.PermissionAdmin == ctype.Role(claims.Role) {
+		err = global.DB.Model(userModel).Where("id = ?", id).Updates(req).Update("permission", req.Role).Error
 		if err != nil {
 			global.Log.Error(err)
 			res.ResultFailWithMsg("修改失败", c)
 			return
 		}
-		global.DB.Find(&userModel, "id = ?", cr.ID)
+		global.DB.Find(&userModel, "id = ?", id)
 		userModel.Password = ""
 		res.ResultOkWithData(userModel, c)
 	}
