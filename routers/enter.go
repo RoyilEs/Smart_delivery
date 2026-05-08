@@ -71,6 +71,7 @@ func (router Group) grilleRouter() {
 	router.POST("grille_create", grilleApi.GrilleCreateView)
 	router.POST("item_out_grille", grilleApi.ItemOutGrilleView)
 	router.GET("grille_phone_get_item/:phone", grilleApi.PhoneGetItemsView)
+	router.GET("grilles", middleware.JwtAdmin(), grilleApi.GrilleListView)
 }
 
 // Cors 跨域中间件

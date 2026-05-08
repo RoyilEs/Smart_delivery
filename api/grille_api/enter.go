@@ -9,6 +9,7 @@ import (
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/utils"
+	"Smart_delivery_locker/utils/jwts"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"sort"
@@ -406,4 +407,27 @@ func (GrilleApi) PhoneGetItemsView(c *gin.Context) {
 	}
 
 	res.ResultOkWithListMsg(items, count, fmt.Sprintf("%d个包裹未放入格口", setGrilleNum), c)
+}
+
+type GrilleListRequest struct {
+	Count   int             `json:"count"`
+	Grilles []models.Grille `json:"list"`
+}
+
+func (GrilleApi) GrilleListView(c *gin.Context) {
+	_claims, _ := c.Get("claims")
+	claims := _claims.(*jwts.CustomClaims)
+
+	if ctype.Role(claims.Role) == ctype.PermissionUser {
+		res.ResultFailWithMsg("权限不足", c)
+		return
+	}
+	var grilles GrilleListRequest
+	err := global.DB.Find(&grilles.Grilles).Error
+	if err != nil {
+		res.ResultFailWithError(err, &grilles, c)
+		return
+	}
+	grilles.Count = len(grilles.Grilles)
+	res.ResultOkWithData(grilles, c)
 }
