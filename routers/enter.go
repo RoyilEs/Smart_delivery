@@ -53,6 +53,7 @@ func (router Group) settingsRouter() {
 	router.PUT("settings", middleware.JwtAdmin(), settingsApi.SettingsInfoUpdateView)
 	router.PUT("settings_jwt", middleware.JwtAdmin(), settingsApi.SettingsJwtUpdateView)
 	router.PUT("settings_admin", middleware.JwtAdmin(), settingsApi.SettingsAdminUpdateView)
+	router.PUT("settings/:name", middleware.JwtAdmin(), settingsApi.SettingsUpdateNameView)
 }
 
 // TODO itemRouter 订单api的各种功能
