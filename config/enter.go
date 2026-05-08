@@ -10,4 +10,6 @@ type Config struct {
 	Upload   Upload   `yaml:"upload"`
 	Redis    Redis    `yaml:"redis"`
 	Admin    Admin    `yaml:"admin"`
+	Basic    Basic    `yaml:"basic"`
+	Pickup   Pickup   `yaml:"pickup"`
 }

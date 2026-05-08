@@ -27,6 +27,10 @@ func (SettingsApi) SettingsInfoView(c *gin.Context) {
 		res.ResultOkWithData(global.Config.Jwt, c)
 	case "admin":
 		res.ResultOkWithData(global.Config.Admin, c)
+	case "basic":
+		res.ResultOkWithData(global.Config.Basic, c)
+	case "pickup":
+		res.ResultOkWithData(global.Config.Pickup, c)
 	default:
 		res.ResultFailWithMsg("无对应配置", c)
 	}
