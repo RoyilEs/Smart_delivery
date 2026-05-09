@@ -10,8 +10,10 @@ import (
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/utils"
 	"Smart_delivery_locker/utils/jwts"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 	"sort"
 	"strings"
 )
@@ -141,36 +143,7 @@ func GenerateGrilleIDs(matrix int, size int, grilleCount int) (dto []GrilleConfi
 		seq := generator.GenerateNext()
 		for i := range grilleCount {
 			boxCode = fmt.Sprintf("%s_%d", seq, i)
-			switch ctype.Size(size) {
-			case ctype.SizeSmall:
-				dto = append(dto, GrilleConfigDTO{
-					BoxCode:   boxCode,
-					BoxLength: 30,
-					BoxWidth:  20,
-					BoxHeight: 15,
-				})
-			case ctype.SizeMedium:
-				dto = append(dto, GrilleConfigDTO{
-					BoxCode:   boxCode,
-					BoxLength: 50,
-					BoxWidth:  35,
-					BoxHeight: 25,
-				})
-			case ctype.SizeLarge:
-				dto = append(dto, GrilleConfigDTO{
-					BoxCode:   boxCode,
-					BoxLength: 80,
-					BoxWidth:  60,
-					BoxHeight: 40,
-				})
-			case ctype.SizeXLarge:
-				dto = append(dto, GrilleConfigDTO{
-					BoxCode:   boxCode,
-					BoxLength: 120,
-					BoxWidth:  80,
-					BoxHeight: 60,
-				})
-			}
+			dto = createGrilleConfigDTO(boxCode, ctype.Size(size))
 		}
 	}
 	return
@@ -430,4 +403,82 @@ func (GrilleApi) GrilleListView(c *gin.Context) {
 	}
 	grilles.Count = len(grilles.Grilles)
 	res.ResultOkWithData(grilles, c)
+}
+
+type GrilleUpdateOneRequest struct {
+	models.Grille
+}
+
+// GrilleUpdateOneView 修改单个格口信息 此处id为grille_id
+func (GrilleApi) GrilleUpdateOneView(c *gin.Context) {
+	_claims, _ := c.Get("claims")
+	claims := _claims.(*jwts.CustomClaims)
+
+	if ctype.Role(claims.Role) == ctype.PermissionUser {
+		res.ResultFailWithMsg("权限不足", c)
+		return
+	}
+
+	id := c.Param("id")
+	var cr GrilleUpdateOneRequest
+	err := c.ShouldBindJSON(&cr)
+	if err != nil {
+		res.ResultFailWithError(err, &cr, c)
+		return
+	}
+
+	var grille models.Grille
+	err = global.DB.Take(&grille, "grille_id", cr.GrilleId).Error
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		global.Log.Warn("格口已存在")
+		res.ResultFailWithMsg("格口已存在 请重新申请格口ID", c)
+		return
+	}
+	// 通过尺寸重写xyz
+	dto := createGrilleConfigDTO(cr.GrilleId, cr.Size)
+	cr.X, cr.Y, cr.Z = dto[0].BoxWidth, dto[0].BoxLength, dto[0].BoxHeight
+	err = global.DB.Model(&grille).Where("grille_id = ?", id).Updates(cr).Error
+	if err != nil {
+		res.ResultFailWithError(err, &cr, c)
+		return
+	}
+	global.DB.Find(&grille, "grille_id = ?", id)
+	res.ResultOkWithData(grille, c)
+}
+
+func createGrilleConfigDTO(boxCode string, size ctype.Size) []GrilleConfigDTO {
+	var dto []GrilleConfigDTO
+
+	switch size {
+	case ctype.SizeSmall:
+		dto = append(dto, GrilleConfigDTO{
+			BoxCode:   boxCode,
+			BoxLength: 30,
+			BoxWidth:  20,
+			BoxHeight: 15,
+		})
+	case ctype.SizeMedium:
+		dto = append(dto, GrilleConfigDTO{
+			BoxCode:   boxCode,
+			BoxLength: 50,
+			BoxWidth:  35,
+			BoxHeight: 25,
+		})
+	case ctype.SizeLarge:
+		dto = append(dto, GrilleConfigDTO{
+			BoxCode:   boxCode,
+			BoxLength: 80,
+			BoxWidth:  60,
+			BoxHeight: 40,
+		})
+	case ctype.SizeXLarge:
+		dto = append(dto, GrilleConfigDTO{
+			BoxCode:   boxCode,
+			BoxLength: 120,
+			BoxWidth:  80,
+			BoxHeight: 60,
+		})
+	}
+
+	return dto
 }
