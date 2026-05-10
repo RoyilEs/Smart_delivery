@@ -29,6 +29,7 @@ func InitRouter() *gin.Engine {
 	routerGroup.settingsRouter()
 	routerGroup.itemRouter()
 	routerGroup.grilleRouter()
+	routerGroup.packageRouter()
 
 	return router
 }
@@ -62,6 +63,12 @@ func (router Group) itemRouter() {
 	router.GET("items/:name", itemApi.ItemListView)
 	router.GET("user_items/:name", itemApi.ItemUserListView)
 	router.POST("item_create", itemApi.ItemCreateView)
+}
+
+// TODO packageRouter 针对于后台的各种功能
+func (router Group) packageRouter() {
+	packageApi := api.Api.PackagesApi
+	router.GET("packages", packageApi.PackageListView)
 }
 
 // TODO grilleRouter 格口api的各种功能
