@@ -70,6 +70,7 @@ func (router Group) grilleRouter() {
 	router.POST("grille_form_item_create", grilleApi.GrilleFormItemCreateView)
 	router.POST("grille_create", grilleApi.GrilleCreateView)
 	router.POST("item_out_grille", grilleApi.ItemOutGrilleView)
+	router.POST("grilles/batch", middleware.JwtAdmin(), grilleApi.GrilleUpdateBatchView)
 	router.GET("grille_phone_get_item/:phone", grilleApi.PhoneGetItemsView)
 	router.GET("grilles", middleware.JwtAdmin(), grilleApi.GrilleListView)
 	router.PUT("grilles/:id", middleware.JwtAdmin(), grilleApi.GrilleUpdateOneView)

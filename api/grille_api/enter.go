@@ -437,6 +437,7 @@ func (GrilleApi) GrilleUpdateOneView(c *gin.Context) {
 	// 通过尺寸重写xyz
 	dto := createGrilleConfigDTO(cr.GrilleId, cr.Size)
 	cr.X, cr.Y, cr.Z = dto[0].BoxWidth, dto[0].BoxLength, dto[0].BoxHeight
+
 	err = global.DB.Model(&grille).Where("grille_id = ?", id).Updates(cr).Error
 	if err != nil {
 		res.ResultFailWithError(err, &cr, c)
@@ -444,6 +445,33 @@ func (GrilleApi) GrilleUpdateOneView(c *gin.Context) {
 	}
 	global.DB.Find(&grille, "grille_id = ?", id)
 	res.ResultOkWithData(grille, c)
+}
+
+type GrilleBatchUpdateRequest struct {
+	Ids    []string `json:"ids"`
+	Status string   `json:"status"`
+}
+
+func (GrilleApi) GrilleUpdateBatchView(c *gin.Context) {
+	_claims, _ := c.Get("claims")
+	claims := _claims.(*jwts.CustomClaims)
+	if ctype.Role(claims.Role) == ctype.PermissionUser || ctype.Role(claims.Role) == ctype.PermissionCourier {
+		res.ResultFailWithMsg("权限不足", c)
+		return
+	}
+
+	var cr GrilleBatchUpdateRequest
+	if err := c.ShouldBindJSON(&cr); err != nil {
+		res.ResultFailWithCode(CODE.ArgumentError, c)
+		return
+	}
+
+	result := global.DB.Model(&models.Grille{}).Where("grille_id in ?", cr.Ids).Update("status", cr.Status)
+	if result.Error != nil {
+		res.ResultFailWithError(result.Error, &cr, c)
+		return
+	}
+	res.ResultOkWithMsg(fmt.Sprintf("%d个格口状态更新成功", result.RowsAffected), c)
 }
 
 func createGrilleConfigDTO(boxCode string, size ctype.Size) []GrilleConfigDTO {
