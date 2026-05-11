@@ -19,13 +19,13 @@ func (s Size) String() interface{} {
 	var str string
 	switch s {
 	case SizeLarge:
-		str = "大"
+		str = "large"
 	case SizeMedium:
-		str = "中"
+		str = "medium"
 	case SizeSmall:
-		str = "小"
+		str = "small"
 	case SizeXLarge:
-		str = "超大"
+		str = "large"
 	default:
 		str = "未知"
 	}

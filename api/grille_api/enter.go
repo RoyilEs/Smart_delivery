@@ -116,7 +116,7 @@ func reverseString(s string) string {
 // 参数: matrix  矩阵总体箱子首位编号
 // 尺寸: size 尺寸大小参考 ctype.grille 中的尺寸
 // 格口数量: grilleCount  矩阵中的箱子数量
-func GenerateGrilleIDs(matrix int, size int, grilleCount int) (dto []GrilleConfigDTO) {
+func GenerateGrilleIDs(matrix int, size ctype.Size, grilleCount int) (dto []GrilleConfigDTO) {
 	var (
 		boxCode string
 		grilles []models.Grille
@@ -143,7 +143,7 @@ func GenerateGrilleIDs(matrix int, size int, grilleCount int) (dto []GrilleConfi
 		seq := generator.GenerateNext()
 		for i := range grilleCount {
 			boxCode = fmt.Sprintf("%s_%d", seq, i)
-			dto = createGrilleConfigDTO(boxCode, ctype.Size(size))
+			dto = append(dto, createGrilleConfigDTO(boxCode, size)...)
 		}
 	}
 	return
@@ -224,7 +224,7 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 
 type GrilleCreateRequest struct {
 	Matrix int    `json:"matrix"`
-	Size   int    `json:"size"`
+	Size   string `json:"size"`
 	Count  int    `json:"count"`
 	Remark string `json:"remark"`
 }
@@ -245,25 +245,49 @@ func (GrilleApi) GrilleCreateView(c *gin.Context) {
 		res.ResultFailWithError(err, &cr, c)
 		return
 	}
+	var size ctype.Size
+	switch cr.Size {
+	case ctype.SizeSmall.String():
+		size = ctype.SizeSmall
+	case ctype.SizeLarge.String():
+		size = ctype.SizeLarge
+	case ctype.SizeMedium.String():
+		size = ctype.SizeMedium
+	case ctype.SizeXLarge.String():
+		size = ctype.SizeXLarge
+	}
+	grilles := GenerateGrilleIDs(cr.Matrix, size, cr.Count)
 
-	grilles := GenerateGrilleIDs(cr.Matrix, cr.Size, cr.Count)
 	for _, grille := range grilles {
+		var existing models.Grille
+		result := global.DB.Where("grille_id = ?", grille.BoxCode).First(&existing)
+		if result.Error == nil {
+			continue
+		}
+
 		grilleModel := models.Grille{
 			GrilleId: grille.BoxCode,
 			X:        grille.BoxLength,
 			Y:        grille.BoxWidth,
 			Z:        grille.BoxHeight,
-			Size:     ctype.Size(cr.Size),
+			Size:     size,
 			Status:   status.Idle.String(),
 		}
 		global.DB.Create(&grilleModel)
-		count++
 	}
+
+	// 重新计数并获取新创建的记录
+	count = 0
+	newGrille = []models.Grille{}
 	for _, grille := range grilles {
 		grilleModel := models.Grille{}
-		global.DB.Find(&grilleModel, "grille_id = ?", grille.BoxCode)
-		newGrille = append(newGrille, grilleModel)
+		result := global.DB.Where("grille_id = ?", grille.BoxCode).First(&grilleModel)
+		if result.Error == nil {
+			count++
+			newGrille = append(newGrille, grilleModel)
+		}
 	}
+
 	res.ResultOK(GrilleCreateResponse{
 		Count:   count,
 		Grilles: newGrille,
@@ -388,13 +412,7 @@ type GrilleListRequest struct {
 }
 
 func (GrilleApi) GrilleListView(c *gin.Context) {
-	_claims, _ := c.Get("claims")
-	claims := _claims.(*jwts.CustomClaims)
 
-	if ctype.Role(claims.Role) == ctype.PermissionUser {
-		res.ResultFailWithMsg("权限不足", c)
-		return
-	}
 	var grilles GrilleListRequest
 	err := global.DB.Find(&grilles.Grilles).Error
 	if err != nil {

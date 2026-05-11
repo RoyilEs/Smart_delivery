@@ -179,14 +179,14 @@ func (UserApi) UserCreateView(c *gin.Context) {
 }
 
 type UserCreateWebRequest struct {
-	Username string     `json:"username"` //	是	账号
-	Nickname string     `json:"nickname"` //	是	昵称
-	Phone    string     `json:"phone"`    //是	手机号
-	Email    string     `json:"email"`    //是	邮箱
-	Role     ctype.Role `json:"role"`     //是	admin / courier / user
-	Status   string     `json:"status"`   //是	enabled / disabled
-	Password string     `json:"password"` //是	初始密码
-	Avatar   string     `json:"avatar"`   //否	头像
+	Username string `json:"username"` //	是	账号
+	Nickname string `json:"nickname"` //	是	昵称
+	Phone    string `json:"phone"`    //是	手机号
+	Email    string `json:"email"`    //是	邮箱
+	Role     string `json:"role"`     //是	admin / courier / user
+	Status   string `json:"status"`   //是	enabled / disabled
+	Password string `json:"password"` //是	初始密码
+	Avatar   string `json:"avatar"`   //否	头像
 }
 
 // UsersCreateFormWebView Web方面的用户建立
@@ -204,6 +204,17 @@ func (UserApi) UsersCreateFormWebView(c *gin.Context) {
 		res.ResultFailWithMsg("手机号已存在", c)
 		return
 	}
+	var role ctype.Role
+	switch cr.Role {
+	case ctype.PermissionAdmin.String():
+		role = ctype.PermissionAdmin
+	case ctype.PermissionCourier.String():
+		role = ctype.PermissionCourier
+	case ctype.PermissionUser.String():
+		role = ctype.PermissionUser
+	case ctype.PermissionDisableUser.String():
+		role = ctype.PermissionDisableUser
+	}
 
 	hashPassword := pwd.HashPassword(cr.Password)
 	err = global.DB.Create(&models.User{
@@ -214,7 +225,7 @@ func (UserApi) UsersCreateFormWebView(c *gin.Context) {
 		Password:   hashPassword,
 		Avatar:     cr.Avatar,
 		Status:     status.Enabled.String(),
-		Permission: cr.Role,
+		Permission: role,
 	}).Error
 	if err != nil {
 		global.Log.Error(err)
