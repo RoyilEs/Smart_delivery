@@ -43,3 +43,21 @@ func (PackageApi) PackageListView(c *gin.Context) {
 	}
 	res.ResultOkWithList(cr, int64(len(cr)), c)
 }
+
+func (PackageApi) PackageUpdateVIew(c *gin.Context) {
+	id := c.Param("id")
+	var cr models.Item
+	err := c.ShouldBindJSON(&cr)
+	if err != nil {
+		res.ResultFailWithError(err, &cr, c)
+		return
+	}
+	var item models.Item
+	err = global.DB.Model(&item).Where("id = ?", id).Updates(cr).Error
+	if err != nil {
+		res.ResultFailWithMsg("包裹更新失败", c)
+		return
+	}
+	global.DB.Find(&item, id)
+	res.ResultOkWithData(item, c)
+}

@@ -69,6 +69,7 @@ func (router Group) itemRouter() {
 func (router Group) packageRouter() {
 	packageApi := api.Api.PackagesApi
 	router.GET("packages", packageApi.PackageListView)
+	router.PUT("packages/:id", packageApi.PackageUpdateVIew)
 }
 
 // TODO grilleRouter 格口api的各种功能
