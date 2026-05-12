@@ -4,7 +4,6 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
-	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
@@ -14,6 +13,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"math"
 	"sort"
 	"strings"
 )
@@ -47,14 +47,6 @@ func FindAllFitGrilles(item models.Item, grilles []models.Grille) []models.Grill
 		}
 	}
 	return fitGrids
-}
-
-// GrilleConfigDTO 定义格口基础信息结构体（存储总体箱子+位置的尺寸映射）
-type GrilleConfigDTO struct {
-	BoxCode   string  // 总体箱子编号
-	BoxLength float64 // 总体箱子长度
-	BoxWidth  float64 // 总体箱子宽度
-	BoxHeight float64 // 总体箱子高度
 }
 
 type SequenceGenerator struct {
@@ -112,41 +104,119 @@ func reverseString(s string) string {
 	return string(runes)
 }
 
-// GenerateGrilleIDs 生成格口ID列表
-// 参数: matrix  矩阵总体箱子首位编号
-// 尺寸: size 尺寸大小参考 ctype.grille 中的尺寸
-// 格口数量: grilleCount  矩阵中的箱子数量
-func GenerateGrilleIDs(matrix int, size ctype.Size, grilleCount int) (dto []GrilleConfigDTO) {
-	var (
-		boxCode string
-		grilles []models.Grille
-		seqs    []string
-	)
-	// 创建序号生成器 依旧无脑责任链模式 到处拉屎
-	generator := NewSequenceGenerator()
-
-	if err := global.DB.Find(&grilles).Error; err != nil {
-		global.Log.Error("[error] 获取格口失败", err)
-		return
+// getSizeDimensions 根据尺寸类型返回格口的长宽高 (X, Y, Z)
+func getSizeDimensions(size ctype.Size) (x, y, z float64) {
+	switch size {
+	case ctype.SizeSmall:
+		return 30, 20, 15
+	case ctype.SizeMedium:
+		return 50, 35, 25
+	case ctype.SizeLarge:
+		return 80, 60, 40
+	case ctype.SizeXLarge:
+		return 120, 80, 60
+	default:
+		return 50, 35, 25
 	}
-	// 获取已使用的序号
-	for _, m := range grilles {
-		split := strings.Split(m.GrilleId, "_")
-		seqs = append(seqs, split[0])
+}
+
+// getNextCabinetLetter 获取下一个可用的柜子字母（A, B, C, ...）
+// 查询数据库中已存在的 CabinetId，提取首字母，取最大值后 +1
+func getNextCabinetLetter(db *gorm.DB) (string, error) {
+	var letters []string
+	// 假设 CabinetId 格式为 "{字母}X-1"，提取第一个字符
+	if err := db.Model(&models.Grille{}).
+		Distinct("SUBSTRING(cabinet_id, 1, 1)").
+		Pluck("SUBSTRING(cabinet_id, 1, 1)", &letters).Error; err != nil {
+		return "A", err // 出错时默认返回A
 	}
 
-	for _, seq := range seqs {
-		generator.MarkUsed(seq)
-	}
-
-	for range matrix {
-		seq := generator.GenerateNext()
-		for i := range grilleCount {
-			boxCode = fmt.Sprintf("%s_%d", seq, i)
-			dto = append(dto, createGrilleConfigDTO(boxCode, size)...)
+	maxLetter := 'A' - 1
+	for _, l := range letters {
+		if len(l) > 0 {
+			c := rune(l[0])
+			if c >= 'A' && c <= 'Z' && c > maxLetter {
+				maxLetter = c
+			}
 		}
 	}
-	return
+	next := maxLetter + 1
+	if next > 'Z' {
+		return "", fmt.Errorf("柜子字母已用尽（A-Z）")
+	}
+	return string(next), nil
+}
+
+// GenerateGrilleIDs 根据 matrix(层数)、size(尺寸类型)、count(每层格口数) 生成格口列表
+// 返回生成的 Grille 对象切片（未入库），并自动计算行列位置、分配柜子字母和格口序号
+func GenerateGrilleIDs(matrix int, size ctype.Size, count int) ([]models.Grille, error) {
+	var grilles []models.Grille
+
+	// 1. 获取下一个可用的柜子字母
+	cabinetLetter, err := getNextCabinetLetter(global.DB)
+	if err != nil {
+		return nil, err
+	}
+	cabinetId := fmt.Sprintf("%sX-1", cabinetLetter)   // 例如 "AX-1"
+	cabinetCode := fmt.Sprintf("%s区主柜", cabinetLetter) // 例如 "A区主柜"
+
+	// 2. 计算每层的行列布局（尽量接近正方形）
+	cols := int(math.Ceil(math.Sqrt(float64(count))))
+	rows := int(math.Ceil(float64(count) / float64(cols)))
+
+	// 3. 准备序号生成器（用于 GrilleId 的前缀字母）
+	generator := NewSequenceGenerator()
+	// 标记已使用的序号（从数据库中已有的 GrilleId 提取前缀）
+	var existingGrilles []models.Grille
+	if err := global.DB.Find(&existingGrilles).Error; err != nil {
+		return nil, err
+	}
+	for _, g := range existingGrilles {
+		parts := strings.Split(g.GrilleId, "_")
+		if len(parts) > 0 {
+			generator.MarkUsed(parts[0])
+		}
+	}
+
+	// 4. 获取尺寸值
+	xDim, yDim, zDim := getSizeDimensions(size)
+
+	// 5. 遍历每一层
+	for layer := 1; layer <= matrix; layer++ {
+		// 每层使用一个新的序号前缀（A, B, C...）
+		seq := generator.GenerateNext()
+
+		// 遍历该层中的所有格口
+		for i := 0; i < count; i++ {
+			// 计算在当前层中的行号和列号（从1开始）
+			row := i/cols + 1
+			col := i%cols + 1
+			// 如果 row 超过了实际行数（最后一行的列数可能不足），跳过（实际不会超过，因为 rows 已按 ceil 计算）
+			if row > rows {
+				continue
+			}
+
+			grilleId := fmt.Sprintf("%s_%d", seq, i)
+
+			grille := models.Grille{
+				GrilleId:     grilleId,
+				X:            xDim,
+				Y:            yDim,
+				Z:            zDim,
+				Size:         size,
+				CabinetId:    cabinetId,
+				CabinetCode:  cabinetCode,
+				MatrixRow:    row,
+				MatrixColumn: col,
+				Layer:        layer,
+				Status:       "idle",
+				Remark:       "",
+			}
+			grilles = append(grilles, grille)
+		}
+	}
+
+	return grilles, nil
 }
 
 type GrilleFormItemCreateRequest struct {
@@ -256,24 +326,21 @@ func (GrilleApi) GrilleCreateView(c *gin.Context) {
 	case ctype.SizeXLarge.String():
 		size = ctype.SizeXLarge
 	}
-	grilles := GenerateGrilleIDs(cr.Matrix, size, cr.Count)
+
+	grilles, err := GenerateGrilleIDs(cr.Matrix, size, cr.Count)
+	if err != nil {
+		res.ResultFailWithError(err, &cr, c)
+		return
+	}
 
 	for _, grille := range grilles {
 		var existing models.Grille
-		result := global.DB.Where("grille_id = ?", grille.BoxCode).First(&existing)
+		result := global.DB.Where("grille_id = ?", grille.GrilleId).First(&existing)
 		if result.Error == nil {
 			continue
 		}
-
-		grilleModel := models.Grille{
-			GrilleId: grille.BoxCode,
-			X:        grille.BoxLength,
-			Y:        grille.BoxWidth,
-			Z:        grille.BoxHeight,
-			Size:     size,
-			Status:   status.Idle.String(),
-		}
-		global.DB.Create(&grilleModel)
+		fmt.Println(grille)
+		global.DB.Create(&grille)
 	}
 
 	// 重新计数并获取新创建的记录
@@ -281,7 +348,7 @@ func (GrilleApi) GrilleCreateView(c *gin.Context) {
 	newGrille = []models.Grille{}
 	for _, grille := range grilles {
 		grilleModel := models.Grille{}
-		result := global.DB.Where("grille_id = ?", grille.BoxCode).First(&grilleModel)
+		result := global.DB.Where("grille_id = ?", grille.GrilleId).First(&grilleModel)
 		if result.Error == nil {
 			count++
 			newGrille = append(newGrille, grilleModel)
@@ -452,10 +519,9 @@ func (GrilleApi) GrilleUpdateOneView(c *gin.Context) {
 		res.ResultFailWithMsg("格口已存在 请重新申请格口ID", c)
 		return
 	}
+	global.DB.Find(&grille, "grille_id = ?", id)
 	// 通过尺寸重写xyz
-	dto := createGrilleConfigDTO(cr.GrilleId, cr.Size)
-	cr.X, cr.Y, cr.Z = dto[0].BoxWidth, dto[0].BoxLength, dto[0].BoxHeight
-
+	cr.X, cr.Y, cr.Z = getSizeDimensions(cr.Size)
 	err = global.DB.Model(&grille).Where("grille_id = ?", id).Updates(cr).Error
 	if err != nil {
 		res.ResultFailWithError(err, &cr, c)
@@ -490,41 +556,4 @@ func (GrilleApi) GrilleUpdateBatchView(c *gin.Context) {
 		return
 	}
 	res.ResultOkWithMsg(fmt.Sprintf("%d个格口状态更新成功", result.RowsAffected), c)
-}
-
-func createGrilleConfigDTO(boxCode string, size ctype.Size) []GrilleConfigDTO {
-	var dto []GrilleConfigDTO
-
-	switch size {
-	case ctype.SizeSmall:
-		dto = append(dto, GrilleConfigDTO{
-			BoxCode:   boxCode,
-			BoxLength: 30,
-			BoxWidth:  20,
-			BoxHeight: 15,
-		})
-	case ctype.SizeMedium:
-		dto = append(dto, GrilleConfigDTO{
-			BoxCode:   boxCode,
-			BoxLength: 50,
-			BoxWidth:  35,
-			BoxHeight: 25,
-		})
-	case ctype.SizeLarge:
-		dto = append(dto, GrilleConfigDTO{
-			BoxCode:   boxCode,
-			BoxLength: 80,
-			BoxWidth:  60,
-			BoxHeight: 40,
-		})
-	case ctype.SizeXLarge:
-		dto = append(dto, GrilleConfigDTO{
-			BoxCode:   boxCode,
-			BoxLength: 120,
-			BoxWidth:  80,
-			BoxHeight: 60,
-		})
-	}
-
-	return dto
 }
