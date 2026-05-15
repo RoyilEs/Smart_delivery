@@ -152,7 +152,6 @@ func getNextCabinetLetter(db *gorm.DB) (string, error) {
 func GenerateGrilleIDs(matrix int, size ctype.Size, count int) ([]models.Grille, error) {
 	var grilles []models.Grille
 
-	// 1. 获取下一个可用的柜子字母
 	cabinetLetter, err := getNextCabinetLetter(global.DB)
 	if err != nil {
 		return nil, err
@@ -160,11 +159,9 @@ func GenerateGrilleIDs(matrix int, size ctype.Size, count int) ([]models.Grille,
 	cabinetId := fmt.Sprintf("%sX-1", cabinetLetter)   // 例如 "AX-1"
 	cabinetCode := fmt.Sprintf("%s区主柜", cabinetLetter) // 例如 "A区主柜"
 
-	// 2. 计算每层的行列布局（尽量接近正方形）
 	cols := int(math.Ceil(math.Sqrt(float64(count))))
 	rows := int(math.Ceil(float64(count) / float64(cols)))
 
-	// 3. 准备序号生成器（用于 GrilleId 的前缀字母）
 	generator := NewSequenceGenerator()
 	// 标记已使用的序号（从数据库中已有的 GrilleId 提取前缀）
 	var existingGrilles []models.Grille
@@ -178,15 +175,12 @@ func GenerateGrilleIDs(matrix int, size ctype.Size, count int) ([]models.Grille,
 		}
 	}
 
-	// 4. 获取尺寸值
 	xDim, yDim, zDim := getSizeDimensions(size)
 
-	// 5. 遍历每一层
 	for layer := 1; layer <= matrix; layer++ {
 		// 每层使用一个新的序号前缀（A, B, C...）
 		seq := generator.GenerateNext()
 
-		// 遍历该层中的所有格口
 		for i := 0; i < count; i++ {
 			// 计算在当前层中的行号和列号（从1开始）
 			row := i/cols + 1
