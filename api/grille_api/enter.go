@@ -10,13 +10,16 @@ import (
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/utils"
 	"Smart_delivery_locker/utils/jwts"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"math"
+	"math/big"
 	"sort"
 	"strings"
+	"time"
 )
 
 type GrilleApi struct{}
@@ -214,6 +217,23 @@ func GenerateGrilleIDs(matrix int, size ctype.Size, count int) ([]models.Grille,
 	return grilles, nil
 }
 
+// GeneratePickupCode 生成纯数字取件码
+// length: 取件码长度，建议6-8位
+func GeneratePickupCode(length int) string {
+	maxNum := big.NewInt(1)
+	for i := 0; i < length; i++ {
+		maxNum.Mul(maxNum, big.NewInt(10))
+	}
+
+	n, err := rand.Int(rand.Reader, maxNum)
+	if err != nil {
+		// 降级方案：使用时间戳
+		return fmt.Sprintf("%0*d", length, time.Now().UnixNano()%1000000)
+	}
+
+	return fmt.Sprintf("%0*d", length, n)
+}
+
 type GrilleFormItemCreateRequest struct {
 	LogisticsIds []string `json:"logistics_ids"`
 }
@@ -267,6 +287,7 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 			flag := IsItemFitGrille(item, grille)
 			// 成功则适配 检索下一个 放入表中
 			if flag && grille.Status == status.Idle.String() {
+				pickupCode := GeneratePickupCode(global.Config.Pickup.CodeLength)
 				global.DB.Model(&grilles[j]).
 					Update("logistics_id", item.LogisticsId).
 					Update("status", status.Occupied.String())
@@ -276,7 +297,8 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 					Update("cabinet_id", grilles[j].CabinetId).
 					Update("cabinet_code", grilles[j].CabinetCode).
 					Update("grille_status", grilles[j].Status).
-					Update("status", status.Stored.String())
+					Update("status", status.Stored.String()).
+					Update("pickup_code", pickupCode)
 				count++
 				break
 			}
