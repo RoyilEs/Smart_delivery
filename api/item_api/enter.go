@@ -4,6 +4,7 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
@@ -169,6 +170,7 @@ func (ItemApi) ItemCreateView(c *gin.Context) {
 		SenderArea:      cr.SenderArea,
 		SenderAddress:   cr.SenderAddress,
 		LogisticsId:     logisticId,
+		Status:          status.Created.String(),
 	}
 
 	// 检测这个邮寄用户是否在数据库中 不存在则建立

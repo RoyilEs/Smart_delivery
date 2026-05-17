@@ -20,9 +20,9 @@ func (s GrilleStatus) String() string {
 	case Idle:
 		str = "idle"
 	case Occupied:
-		str = "occupied"
+		str = "occupied" // 占用
 	case GrilleDisabled:
-		str = "grille_disabled"
+		str = "disabled" // 停用
 	default:
 		str = "nil"
 	}

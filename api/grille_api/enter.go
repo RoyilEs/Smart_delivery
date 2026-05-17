@@ -4,6 +4,7 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
@@ -256,19 +257,26 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 		global.Log.Error("[error] 获取空格口失败", err)
 		return
 	}
-
 	if len(grilles) < len(items) {
 		res.ResultFailWithMsg("格口数量不足 请管理员添加格口", c)
 		return
 	}
 
-	for _, item := range items {
-		for _, grille := range grilles {
+	for i, item := range items {
+		for j, grille := range grilles {
 			flag := IsItemFitGrille(item, grille)
 			// 成功则适配 检索下一个 放入表中
-			if flag {
-				global.DB.Model(&grilles[count]).Update("logistics_id", item.LogisticsId)
-				global.DB.Model(&items[count]).Update("grille_id", grilles[count].GrilleId)
+			if flag && grille.Status == status.Idle.String() {
+				global.DB.Model(&grilles[j]).
+					Update("logistics_id", item.LogisticsId).
+					Update("status", status.Occupied.String())
+
+				global.DB.Model(&items[i]).
+					Update("grille_id", grilles[j].GrilleId).
+					Update("cabinet_id", grilles[j].CabinetId).
+					Update("cabinet_code", grilles[j].CabinetCode).
+					Update("grille_status", grilles[j].Status).
+					Update("status", status.Stored.String())
 				count++
 				break
 			}
