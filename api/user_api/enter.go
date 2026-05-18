@@ -15,9 +15,10 @@ import (
 	"Smart_delivery_locker/utils/pwd"
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"strconv"
 	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 )
@@ -438,12 +439,12 @@ func (UserApi) UserDeleteView(c *gin.Context) {
 }
 
 type UpdateUserRequest struct {
-	Username string     `json:"username"` //	是	账号
-	Nickname string     `json:"nickname"` //	是	昵称
-	Phone    string     `json:"phone"`    //是	手机号
-	Email    string     `json:"email"`    //是	邮箱
-	Role     ctype.Role `json:"role"`     //是	admin / courier / user
-	Status   string     `json:"status"`   //是	enabled / disabled
+	Username string `json:"username"` //	是	账号
+	Nickname string `json:"nickname"` //	是	昵称
+	Phone    string `json:"phone"`    //是	手机号
+	Email    string `json:"email"`    //是	邮箱
+	Role     string `json:"role"`     //是	admin / courier / user
+	Status   string `json:"status"`   //是	enabled / disabled
 }
 
 func (UserApi) UserUpdateView(c *gin.Context) {
@@ -457,6 +458,15 @@ func (UserApi) UserUpdateView(c *gin.Context) {
 		res.ResultFailWithError(err, &req, c)
 		return
 	}
+	var role ctype.Role
+	switch req.Role {
+	case ctype.PermissionAdmin.String():
+		role = ctype.PermissionAdmin
+	case ctype.PermissionUser.String():
+		role = ctype.PermissionUser
+	case ctype.PermissionCourier.String():
+		role = ctype.PermissionCourier
+	}
 
 	var userModel models.User
 	// 本人操作
@@ -468,7 +478,7 @@ func (UserApi) UserUpdateView(c *gin.Context) {
 	idi, _ := strconv.Atoi(id)
 	// 同ID 或者 管理员操作
 	if uint(idi) == claims.UserID || ctype.PermissionAdmin == ctype.Role(claims.Role) {
-		err = global.DB.Model(userModel).Where("id = ?", id).Updates(req).Update("permission", req.Role).Error
+		err = global.DB.Model(userModel).Where("id = ?", id).Updates(req).Update("permission", role).Error
 		if err != nil {
 			global.Log.Error(err)
 			res.ResultFailWithMsg("修改失败", c)
