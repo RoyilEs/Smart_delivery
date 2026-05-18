@@ -114,13 +114,13 @@ func (ItemApi) ItemUserListView(c *gin.Context) {
 type ItemCreateRequest struct {
 	ReceiverName    string  `json:"receiverName" binding:"required" msg:"请输入收件人姓名"`
 	ReceiverPhone   string  `json:"receiverPhone" binding:"required" msg:"请输入收件人手机号"`
-	ReceiverEmail   string  `json:"receiverEmail" binding:"required" msg:"请输入收件人邮箱"`
+	ReceiverEmail   string  `json:"receiverEmail"`
 	ReceiverCity    string  `json:"receiverCity" binding:"required" msg:"请输入收件人城市"`
 	ReceiverArea    string  `json:"receiverArea" binding:"required" msg:"请输入收件人区县"`
 	ReceiverAddress string  `json:"receiverAddress" binding:"required" msg:"请输入收件人地址"`
 	SenderName      string  `json:"senderName" binding:"required" msg:"请输入发件人姓名"`
 	SenderPhone     string  `json:"senderPhone" binding:"required" msg:"请输入发件人手机号"`
-	SenderEmail     string  `json:"senderEmail" binding:"required" msg:"请输入发件人邮箱"`
+	SenderEmail     string  `json:"senderEmail"`
 	SenderCity      string  `json:"senderCity" binding:"required" msg:"请输入发件人城市"`
 	SenderArea      string  `json:"senderArea" binding:"required" msg:"请输入发件人区县"`
 	SenderAddress   string  `json:"senderAddress" binding:"required" msg:"请输入发件人地址"`
