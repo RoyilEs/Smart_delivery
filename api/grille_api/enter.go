@@ -477,12 +477,12 @@ func (GrilleApi) PhoneGetItemsView(c *gin.Context) {
 		setGrilleNum int64
 	)
 
-	list, _, _ := common.ComList(models.Item{SenderPhone: userModel.Phone}, common.Option{
+	list, _, _ := common.ComList(models.Item{ReceiverPhone: userModel.Phone}, common.Option{
 		PageInfo: page.PageInfo,
 	})
 	fmt.Println(len(list))
 	for _, item := range list {
-		if item.SenderPhone == userModel.Phone {
+		if item.ReceiverPhone == userModel.Phone {
 			items = append(items, ItemResponse{
 				Item: item,
 			})

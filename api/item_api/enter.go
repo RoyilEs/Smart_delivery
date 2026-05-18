@@ -10,6 +10,7 @@ import (
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/service/user_ser"
 	"Smart_delivery_locker/utils/pwd"
+	"fmt"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,43 +43,34 @@ func (ItemApi) ItemListView(c *gin.Context) {
 		return
 	}
 
-	var userModel models.User
-	err := global.DB.Where("username = ?", cr.Name).Find(&userModel).Error
+	var (
+		userModel models.User
+		itemModel models.Item
+	)
+	err := global.DB.Where("logistics_id = ?", cr.Name).Find(&itemModel).Error
+	if err != nil {
+		res.ResultFailWithMsg("包裹不存在", c)
+		return
+	}
+	err = global.DB.Where("phone = ?", itemModel.ReceiverPhone).Find(&userModel).Error
 	if err != nil {
 		res.ResultFailWithMsg("用户不存在", c)
 		return
 	}
-
+	fmt.Println(userModel)
 	var (
 		items []ItemResponse
 		count int64
 	)
-	// 普通用户
-	if userModel.Permission == ctype.PermissionUser {
-		list, _, _ := common.ComList(models.Item{SenderName: userModel.Username}, common.Option{
-			PageInfo: page.PageInfo,
-		})
+	list, _, _ := common.ComList(models.Item{ReceiverName: userModel.Username}, common.Option{
+		PageInfo: page.PageInfo,
+	})
 
-		for _, item := range list {
-			if item.SenderName == userModel.Username {
-				items = append(items, ItemResponse{
-					Item: item,
-				})
-				count++
-			}
-		}
-	}
-	// 快递员与管理员
-	if userModel.Permission == ctype.PermissionCourier || userModel.Permission == ctype.PermissionAdmin {
-		list, c, _ := common.ComList(models.Item{}, common.Option{
-			PageInfo: page.PageInfo,
+	for _, item := range list {
+		items = append(items, ItemResponse{
+			Item: item,
 		})
-		count = c
-		for _, item := range list {
-			items = append(items, ItemResponse{
-				Item: item,
-			})
-		}
+		count++
 	}
 	res.ResultOkWithList(items, count, c)
 }
@@ -98,7 +90,7 @@ func (ItemApi) ItemUserListView(c *gin.Context) {
 	}
 
 	var userModel models.User
-	err := global.DB.Where("username = ?", cr.Name).Find(&userModel).Error
+	err := global.DB.Where("phone = ?", cr.Name).Find(&userModel).Error
 	if err != nil {
 		res.ResultFailWithMsg("用户不存在", c)
 		return

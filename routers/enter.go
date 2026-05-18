@@ -40,6 +40,7 @@ func (router Group) userRouter() {
 	router.GET("users", middleware.JwtAuth(), userApi.UserListView)
 	router.POST("user_login", userApi.LoginView)
 	router.POST("user_create", userApi.UserCreateView)
+	router.POST("user_smart_create", userApi.UserSmartCreateView)
 	router.POST("users", userApi.UsersCreateFormWebView) // 区分命令行建立用户 此处检测Phone的差别
 	router.DELETE("user_remove", userApi.UserRemoveView)
 	router.DELETE("users/:id", middleware.JwtAdmin(), userApi.UserDeleteView)
@@ -60,7 +61,7 @@ func (router Group) settingsRouter() {
 // TODO itemRouter 订单api的各种功能
 func (router Group) itemRouter() {
 	itemApi := api.Api.ItemApi
-	router.GET("items/:name", itemApi.ItemListView)
+	router.GET("items/*name", itemApi.ItemListView)
 	router.GET("user_items/:name", itemApi.ItemUserListView)
 	router.POST("item_create", itemApi.ItemCreateView)
 }
