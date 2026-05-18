@@ -26,7 +26,8 @@ type UserApi struct{}
 
 type UserResponse struct {
 	models.User
-	RoleID int `json:"role_id"`
+	RoleID int    `json:"role_id"`
+	Role   string `json:"role"`
 }
 
 type UserListRequest struct {
@@ -59,9 +60,22 @@ func (UserApi) UserListView(c *gin.Context) {
 		// 脱敏
 		user.Phone = utils.DesensitizationTel(user.Phone)
 		user.Email = utils.DesensitizationEmail(user.Email)
+		var role string
+		switch user.Permission {
+		case 1:
+			role = "admin"
+		case 2:
+			role = "user"
+		case 3:
+			role = "courier"
+		case 4:
+			role = "outer"
+
+		}
 		users = append(users, UserResponse{
 			User:   user,
 			RoleID: int(user.Permission),
+			Role:   role,
 		})
 	}
 

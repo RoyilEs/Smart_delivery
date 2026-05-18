@@ -292,13 +292,15 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 					Update("logistics_id", item.LogisticsId).
 					Update("status", status.Occupied.String())
 
+				iso8601 := utils.ToISO8601(time.Now())
 				global.DB.Model(&items[i]).
 					Update("grille_id", grilles[j].GrilleId).
 					Update("cabinet_id", grilles[j].CabinetId).
 					Update("cabinet_code", grilles[j].CabinetCode).
 					Update("grille_status", grilles[j].Status).
 					Update("status", status.Stored.String()).
-					Update("pickup_code", pickupCode)
+					Update("pickup_code", pickupCode).
+					Update("inbound_at", iso8601)
 				count++
 				break
 			}
@@ -498,19 +500,39 @@ func (GrilleApi) PhoneGetItemsView(c *gin.Context) {
 }
 
 type GrilleListRequest struct {
-	Count   int             `json:"count"`
-	Grilles []models.Grille `json:"list"`
+	Count   int         `json:"count"`
+	Grilles []GrilleDTO `json:"list"`
+}
+
+type GrilleDTO struct {
+	models.Grille
+	PickupCode string `json:"pickupCode"`
 }
 
 func (GrilleApi) GrilleListView(c *gin.Context) {
+	var grillesList []models.Grille
 
-	var grilles GrilleListRequest
-	err := global.DB.Find(&grilles.Grilles).Error
+	err := global.DB.Find(&grillesList).Error
 	if err != nil {
-		res.ResultFailWithError(err, &grilles, c)
+		res.ResultFailWithError(err, nil, c)
 		return
 	}
-	grilles.Count = len(grilles.Grilles)
+
+	grilles := GrilleListRequest{
+		Count:   len(grillesList),
+		Grilles: make([]GrilleDTO, len(grillesList)),
+	}
+
+	for i, grille := range grillesList {
+		grilles.Grilles[i].Grille = grille
+
+		var item models.Item
+		err := global.DB.Where("logistics_id = ?", grille.LogisticsId).First(&item).Error
+		if err == nil {
+			grilles.Grilles[i].PickupCode = item.PickupCode
+		}
+	}
+
 	res.ResultOkWithData(grilles, c)
 }
 
