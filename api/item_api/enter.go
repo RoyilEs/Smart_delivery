@@ -10,8 +10,8 @@ import (
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/service/user_ser"
 	"Smart_delivery_locker/utils/pwd"
-	"fmt"
 	"github.com/gin-gonic/gin"
+	"strings"
 )
 
 type ItemApi struct{}
@@ -36,6 +36,9 @@ func (ItemApi) ItemListView(c *gin.Context) {
 		res.ResultFailWithCode(CODE.ArgumentError, c)
 		return
 	}
+	if strings.HasPrefix(cr.Name, "/") {
+		cr.Name = cr.Name[1:]
+	}
 
 	var page ItemListRequest
 	if err := c.ShouldBind(&page); err != nil {
@@ -47,31 +50,25 @@ func (ItemApi) ItemListView(c *gin.Context) {
 		userModel models.User
 		itemModel models.Item
 	)
-	err := global.DB.Where("logistics_id = ?", cr.Name).Find(&itemModel).Error
+
+	err := global.DB.Where("logistics_id = ?", cr.Name).Take(&itemModel).Error
 	if err != nil {
 		res.ResultFailWithMsg("包裹不存在", c)
 		return
 	}
-	err = global.DB.Where("phone = ?", itemModel.ReceiverPhone).Find(&userModel).Error
+	err = global.DB.Where("phone = ?", itemModel.ReceiverPhone).Take(&userModel).Error
 	if err != nil {
 		res.ResultFailWithMsg("用户不存在", c)
 		return
 	}
-	fmt.Println(userModel)
 	var (
 		items []ItemResponse
 		count int64
 	)
-	list, _, _ := common.ComList(models.Item{ReceiverName: userModel.Username}, common.Option{
-		PageInfo: page.PageInfo,
+	items = append(items, ItemResponse{
+		Item: itemModel,
 	})
-
-	for _, item := range list {
-		items = append(items, ItemResponse{
-			Item: item,
-		})
-		count++
-	}
+	count = 1
 	res.ResultOkWithList(items, count, c)
 }
 
