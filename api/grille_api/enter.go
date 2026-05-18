@@ -419,8 +419,9 @@ func (GrilleApi) ItemOutGrilleView(c *gin.Context) {
 
 	// 出库操作
 	for i, item := range items {
-		global.DB.Model(&item).Update("grille_id", "").Update("status", "picked_up")
-		global.DB.Model(&grilles[i]).Update("logistics_id", "").Update("status", "empty")
+		iso8601 := utils.ToISO8601(time.Now())
+		global.DB.Model(&item).Update("grille_id", "").Update("status", "picked_up").Update("outbound_at", iso8601)
+		global.DB.Model(&grilles[i]).Update("logistics_id", "").Update("status", "idle")
 	}
 
 	// TODO 测试阶段不做删除

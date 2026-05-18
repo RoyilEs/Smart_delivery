@@ -34,7 +34,6 @@ func InitRouter() *gin.Engine {
 	return router
 }
 
-// TODO userRouter 用户api的各种功能
 func (router Group) userRouter() {
 	userApi := api.Api.UserApi
 	router.GET("users", middleware.JwtAuth(), userApi.UserListView)
@@ -58,7 +57,6 @@ func (router Group) settingsRouter() {
 	router.PUT("settings/:name", middleware.JwtAdmin(), settingsApi.SettingsUpdateNameView)
 }
 
-// TODO itemRouter 订单api的各种功能
 func (router Group) itemRouter() {
 	itemApi := api.Api.ItemApi
 	router.GET("items/*name", itemApi.ItemListView)
@@ -66,14 +64,12 @@ func (router Group) itemRouter() {
 	router.POST("item_create", itemApi.ItemCreateView)
 }
 
-// TODO packageRouter 针对于后台的各种功能
 func (router Group) packageRouter() {
 	packageApi := api.Api.PackagesApi
 	router.GET("packages", packageApi.PackageListView)
 	router.PUT("packages/:id", packageApi.PackageUpdateVIew)
 }
 
-// TODO grilleRouter 格口api的各种功能
 func (router Group) grilleRouter() {
 	grilleApi := api.Api.GrilleApi
 	router.POST("grille_form_item_create", grilleApi.GrilleFormItemCreateView)
