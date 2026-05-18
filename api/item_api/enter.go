@@ -97,11 +97,11 @@ func (ItemApi) ItemUserListView(c *gin.Context) {
 		items []ItemResponse
 		count int64
 	)
-	list, _, _ := common.ComList(models.Item{SenderName: userModel.Username}, common.Option{
+	list, _, _ := common.ComList(models.Item{ReceiverName: userModel.Username}, common.Option{
 		PageInfo: page.PageInfo})
 
 	for _, item := range list {
-		if item.SenderName == userModel.Username {
+		if item.ReceiverName == userModel.Username {
 			items = append(items, ItemResponse{
 				Item: item})
 			count += 1

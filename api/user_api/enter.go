@@ -270,7 +270,7 @@ type UserSmartQuery struct {
 
 func (UserApi) UserSmartCreateView(c *gin.Context) {
 	var query UserSmartQuery
-	err := c.BindQuery(&query)
+	err := c.ShouldBindJSON(&query)
 	if err != nil {
 		res.ResultFailWithError(err, &query, c)
 		return
@@ -377,6 +377,16 @@ func (UserApi) UserSmartCreateView(c *gin.Context) {
 			res.ResultOK(loginData, fmt.Sprintf("新用户建立%s登录成功", user.Username), c)
 			return
 		}
+	}
+}
+
+// PickupVerifyView 用户取件
+func (UserApi) PickupVerifyView(c *gin.Context) {
+	var query UserSmartQuery
+	err := c.ShouldBindJSON(&query)
+	if err != nil {
+		res.ResultFailWithError(err, &query, c)
+		return
 	}
 }
 
