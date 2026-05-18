@@ -4,12 +4,14 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/service/user_ser"
 	"Smart_delivery_locker/utils/pwd"
 	"github.com/gin-gonic/gin"
+	"strings"
 )
 
 type ItemApi struct{}
@@ -34,6 +36,9 @@ func (ItemApi) ItemListView(c *gin.Context) {
 		res.ResultFailWithCode(CODE.ArgumentError, c)
 		return
 	}
+	if strings.HasPrefix(cr.Name, "/") {
+		cr.Name = cr.Name[1:]
+	}
 
 	var page ItemListRequest
 	if err := c.ShouldBind(&page); err != nil {
@@ -41,44 +46,29 @@ func (ItemApi) ItemListView(c *gin.Context) {
 		return
 	}
 
-	var userModel models.User
-	err := global.DB.Where("username = ?", cr.Name).Find(&userModel).Error
+	var (
+		userModel models.User
+		itemModel models.Item
+	)
+
+	err := global.DB.Where("logistics_id = ?", cr.Name).Take(&itemModel).Error
+	if err != nil {
+		res.ResultFailWithMsg("包裹不存在", c)
+		return
+	}
+	err = global.DB.Where("phone = ?", itemModel.ReceiverPhone).Take(&userModel).Error
 	if err != nil {
 		res.ResultFailWithMsg("用户不存在", c)
 		return
 	}
-
 	var (
 		items []ItemResponse
 		count int64
 	)
-	// 普通用户
-	if userModel.Permission == ctype.PermissionUser {
-		list, _, _ := common.ComList(models.Item{SenderName: userModel.Username}, common.Option{
-			PageInfo: page.PageInfo,
-		})
-
-		for _, item := range list {
-			if item.SenderName == userModel.Username {
-				items = append(items, ItemResponse{
-					Item: item,
-				})
-				count++
-			}
-		}
-	}
-	// 快递员与管理员
-	if userModel.Permission == ctype.PermissionCourier || userModel.Permission == ctype.PermissionAdmin {
-		list, c, _ := common.ComList(models.Item{}, common.Option{
-			PageInfo: page.PageInfo,
-		})
-		count = c
-		for _, item := range list {
-			items = append(items, ItemResponse{
-				Item: item,
-			})
-		}
-	}
+	items = append(items, ItemResponse{
+		Item: itemModel,
+	})
+	count = 1
 	res.ResultOkWithList(items, count, c)
 }
 
@@ -97,7 +87,7 @@ func (ItemApi) ItemUserListView(c *gin.Context) {
 	}
 
 	var userModel models.User
-	err := global.DB.Where("username = ?", cr.Name).Find(&userModel).Error
+	err := global.DB.Where("phone = ?", cr.Name).Find(&userModel).Error
 	if err != nil {
 		res.ResultFailWithMsg("用户不存在", c)
 		return
@@ -107,11 +97,11 @@ func (ItemApi) ItemUserListView(c *gin.Context) {
 		items []ItemResponse
 		count int64
 	)
-	list, _, _ := common.ComList(models.Item{SenderName: userModel.Username}, common.Option{
+	list, _, _ := common.ComList(models.Item{ReceiverName: userModel.Username}, common.Option{
 		PageInfo: page.PageInfo})
 
 	for _, item := range list {
-		if item.SenderName == userModel.Username {
+		if item.ReceiverName == userModel.Username {
 			items = append(items, ItemResponse{
 				Item: item})
 			count += 1
@@ -124,13 +114,13 @@ func (ItemApi) ItemUserListView(c *gin.Context) {
 type ItemCreateRequest struct {
 	ReceiverName    string  `json:"receiverName" binding:"required" msg:"请输入收件人姓名"`
 	ReceiverPhone   string  `json:"receiverPhone" binding:"required" msg:"请输入收件人手机号"`
-	ReceiverEmail   string  `json:"receiverEmail" binding:"required" msg:"请输入收件人邮箱"`
+	ReceiverEmail   string  `json:"receiverEmail"`
 	ReceiverCity    string  `json:"receiverCity" binding:"required" msg:"请输入收件人城市"`
 	ReceiverArea    string  `json:"receiverArea" binding:"required" msg:"请输入收件人区县"`
 	ReceiverAddress string  `json:"receiverAddress" binding:"required" msg:"请输入收件人地址"`
 	SenderName      string  `json:"senderName" binding:"required" msg:"请输入发件人姓名"`
 	SenderPhone     string  `json:"senderPhone" binding:"required" msg:"请输入发件人手机号"`
-	SenderEmail     string  `json:"senderEmail" binding:"required" msg:"请输入发件人邮箱"`
+	SenderEmail     string  `json:"senderEmail"`
 	SenderCity      string  `json:"senderCity" binding:"required" msg:"请输入发件人城市"`
 	SenderArea      string  `json:"senderArea" binding:"required" msg:"请输入发件人区县"`
 	SenderAddress   string  `json:"senderAddress" binding:"required" msg:"请输入发件人地址"`
@@ -169,6 +159,7 @@ func (ItemApi) ItemCreateView(c *gin.Context) {
 		SenderArea:      cr.SenderArea,
 		SenderAddress:   cr.SenderAddress,
 		LogisticsId:     logisticId,
+		Status:          status.Created.String(),
 	}
 
 	// 检测这个邮寄用户是否在数据库中 不存在则建立

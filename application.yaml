@@ -1,7 +1,7 @@
 mysql:
   dataBase: lock_db
   userName: root
-  passWord: rootroot
+  passWord: root
   port: 3306
   driverName: mysql
   host: 127.0.0.1
@@ -40,3 +40,13 @@ admin:
   avatar: uploads/avatar/Roy.png
   github: ""
   bilibili: ""
+basic:
+  site_name: 恶臭站点
+  pickup_time_out_hours: 48
+  temperature_threshold: 114
+  support_phone: "1145141919"
+pickup:
+  code_length: 6
+  sms_reminder: true
+  allow_anonymous_lookup: true
+  animation_speed: normal

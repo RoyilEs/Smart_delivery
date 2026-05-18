@@ -4,18 +4,22 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/utils"
 	"Smart_delivery_locker/utils/jwts"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"math"
+	"math/big"
 	"sort"
 	"strings"
+	"time"
 )
 
 type GrilleApi struct{}
@@ -213,6 +217,23 @@ func GenerateGrilleIDs(matrix int, size ctype.Size, count int) ([]models.Grille,
 	return grilles, nil
 }
 
+// GeneratePickupCode 生成纯数字取件码
+// length: 取件码长度，建议6-8位
+func GeneratePickupCode(length int) string {
+	maxNum := big.NewInt(1)
+	for i := 0; i < length; i++ {
+		maxNum.Mul(maxNum, big.NewInt(10))
+	}
+
+	n, err := rand.Int(rand.Reader, maxNum)
+	if err != nil {
+		// 降级方案：使用时间戳
+		return fmt.Sprintf("%0*d", length, time.Now().UnixNano()%1000000)
+	}
+
+	return fmt.Sprintf("%0*d", length, n)
+}
+
 type GrilleFormItemCreateRequest struct {
 	LogisticsIds []string `json:"logistics_ids"`
 }
@@ -256,19 +277,30 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 		global.Log.Error("[error] 获取空格口失败", err)
 		return
 	}
-
 	if len(grilles) < len(items) {
 		res.ResultFailWithMsg("格口数量不足 请管理员添加格口", c)
 		return
 	}
 
-	for _, item := range items {
-		for _, grille := range grilles {
+	for i, item := range items {
+		for j, grille := range grilles {
 			flag := IsItemFitGrille(item, grille)
 			// 成功则适配 检索下一个 放入表中
-			if flag {
-				global.DB.Model(&grilles[count]).Update("logistics_id", item.LogisticsId)
-				global.DB.Model(&items[count]).Update("grille_id", grilles[count].GrilleId)
+			if flag && grille.Status == status.Idle.String() {
+				pickupCode := GeneratePickupCode(global.Config.Pickup.CodeLength)
+				global.DB.Model(&grilles[j]).
+					Update("logistics_id", item.LogisticsId).
+					Update("status", status.Occupied.String())
+
+				iso8601 := utils.ToISO8601(time.Now())
+				global.DB.Model(&items[i]).
+					Update("grille_id", grilles[j].GrilleId).
+					Update("cabinet_id", grilles[j].CabinetId).
+					Update("cabinet_code", grilles[j].CabinetCode).
+					Update("grille_status", grilles[j].Status).
+					Update("status", status.Stored.String()).
+					Update("pickup_code", pickupCode).
+					Update("inbound_at", iso8601)
 				count++
 				break
 			}
@@ -387,8 +419,9 @@ func (GrilleApi) ItemOutGrilleView(c *gin.Context) {
 
 	// 出库操作
 	for i, item := range items {
-		global.DB.Model(&item).Update("grille_id", "").Update("status", "picked_up")
-		global.DB.Model(&grilles[i]).Update("logistics_id", "").Update("status", "empty")
+		iso8601 := utils.ToISO8601(time.Now())
+		global.DB.Model(&item).Update("grille_id", "").Update("status", "picked_up").Update("outbound_at", iso8601)
+		global.DB.Model(&grilles[i]).Update("logistics_id", "").Update("status", "idle")
 	}
 
 	// TODO 测试阶段不做删除
@@ -445,12 +478,12 @@ func (GrilleApi) PhoneGetItemsView(c *gin.Context) {
 		setGrilleNum int64
 	)
 
-	list, _, _ := common.ComList(models.Item{SenderPhone: userModel.Phone}, common.Option{
+	list, _, _ := common.ComList(models.Item{ReceiverPhone: userModel.Phone}, common.Option{
 		PageInfo: page.PageInfo,
 	})
 	fmt.Println(len(list))
 	for _, item := range list {
-		if item.SenderPhone == userModel.Phone {
+		if item.ReceiverPhone == userModel.Phone {
 			items = append(items, ItemResponse{
 				Item: item,
 			})
@@ -468,19 +501,39 @@ func (GrilleApi) PhoneGetItemsView(c *gin.Context) {
 }
 
 type GrilleListRequest struct {
-	Count   int             `json:"count"`
-	Grilles []models.Grille `json:"list"`
+	Count   int         `json:"count"`
+	Grilles []GrilleDTO `json:"list"`
+}
+
+type GrilleDTO struct {
+	models.Grille
+	PickupCode string `json:"pickupCode"`
 }
 
 func (GrilleApi) GrilleListView(c *gin.Context) {
+	var grillesList []models.Grille
 
-	var grilles GrilleListRequest
-	err := global.DB.Find(&grilles.Grilles).Error
+	err := global.DB.Find(&grillesList).Error
 	if err != nil {
-		res.ResultFailWithError(err, &grilles, c)
+		res.ResultFailWithError(err, nil, c)
 		return
 	}
-	grilles.Count = len(grilles.Grilles)
+
+	grilles := GrilleListRequest{
+		Count:   len(grillesList),
+		Grilles: make([]GrilleDTO, len(grillesList)),
+	}
+
+	for i, grille := range grillesList {
+		grilles.Grilles[i].Grille = grille
+
+		var item models.Item
+		err := global.DB.Where("logistics_id = ?", grille.LogisticsId).First(&item).Error
+		if err == nil {
+			grilles.Grilles[i].PickupCode = item.PickupCode
+		}
+	}
+
 	res.ResultOkWithData(grilles, c)
 }
 

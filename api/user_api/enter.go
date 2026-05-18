@@ -26,7 +26,8 @@ type UserApi struct{}
 
 type UserResponse struct {
 	models.User
-	RoleID int `json:"role_id"`
+	RoleID int    `json:"role_id"`
+	Role   string `json:"role"`
 }
 
 type UserListRequest struct {
@@ -59,9 +60,22 @@ func (UserApi) UserListView(c *gin.Context) {
 		// 脱敏
 		user.Phone = utils.DesensitizationTel(user.Phone)
 		user.Email = utils.DesensitizationEmail(user.Email)
+		var role string
+		switch user.Permission {
+		case 1:
+			role = "admin"
+		case 2:
+			role = "user"
+		case 3:
+			role = "courier"
+		case 4:
+			role = "outer"
+
+		}
 		users = append(users, UserResponse{
 			User:   user,
 			RoleID: int(user.Permission),
+			Role:   role,
 		})
 	}
 
@@ -111,6 +125,17 @@ func (UserApi) LoginView(c *gin.Context) {
 		return
 	}
 
+	loginData, err := setUserLogin(userModel)
+
+	if err != nil {
+		global.Log.Error("token生成失败", err)
+		res.ResultFailWithMsg("token生成失败", c)
+		return
+	}
+	res.ResultOK(loginData, fmt.Sprintf("用户%s登录成功", userModel.Username), c)
+}
+
+func setUserLogin(userModel models.User) (LoginDataResponse, error) {
 	//登录成功生成token
 	token, err := jwts.GenToken(jwts.JwtPayLoad{
 		Username: userModel.Username,
@@ -144,12 +169,7 @@ func (UserApi) LoginView(c *gin.Context) {
 		global.Log.Error("更新用户登录时间失败", err)
 	}
 
-	if err != nil {
-		global.Log.Error("token生成失败", err)
-		res.ResultFailWithMsg("token生成失败", c)
-		return
-	}
-	res.ResultOK(loginData, fmt.Sprintf("用户%s登录成功", userModel.Username), c)
+	return loginData, err
 }
 
 type UserCreateRequest struct {
@@ -241,6 +261,133 @@ func (UserApi) UsersCreateFormWebView(c *gin.Context) {
 	}
 	userModel.Password = "" // 不返回密码
 	res.ResultOkWithData(userModel, c)
+}
+
+type UserSmartQuery struct {
+	Phone      string `json:"phone" form:"phone"`
+	PickupCode string `json:"pickupCode" form:"pickupCode"`
+}
+
+func (UserApi) UserSmartCreateView(c *gin.Context) {
+	var query UserSmartQuery
+	err := c.ShouldBindJSON(&query)
+	if err != nil {
+		res.ResultFailWithError(err, &query, c)
+		return
+	}
+	var (
+		user models.User
+		item models.Item
+	)
+	userDb := global.DB.Model(&models.User{})
+	itemDb := global.DB.Model(&models.Item{})
+	if query.Phone != "" {
+		result := userDb.Where("phone = ?", query.Phone).Find(&user).RowsAffected
+		// 用户存在
+		if result > 0 {
+			loginData, err := setUserLogin(user)
+
+			if err != nil {
+				global.Log.Error("token生成失败", err)
+				res.ResultFailWithMsg("token生成失败", c)
+				return
+			}
+			res.ResultOK(loginData, fmt.Sprintf("用户%s登录成功", user.Username), c)
+			return
+		} else { // 不存在直接走建立 使用item中的信息数据 接收人Phone
+			re := itemDb.Where("receiver_phone = ?", query.Phone).Find(&item).RowsAffected
+			if re > 0 {
+				hashPassword := pwd.HashPassword("123456")
+				err := userDb.Create(&models.User{
+					Username:   item.ReceiverName,
+					Nickname:   item.ReceiverName,
+					Phone:      item.ReceiverPhone,
+					Email:      item.ReceiverEmail,
+					Password:   hashPassword,
+					Avatar:     "",
+					Status:     status.Enabled.String(),
+					Permission: ctype.PermissionUser,
+				}).Error
+				if err != nil {
+					global.Log.Error(err)
+					res.ResultFailWithMsg("角色创建失败", c)
+					return
+				}
+				if err := userDb.Where("phone = ?", query.Phone).Find(&user).Error; err != nil {
+					res.ResultFailWithMsg("未找到该用户", c)
+					return
+				}
+				loginData, err := setUserLogin(user)
+				if err != nil {
+					global.Log.Error("token生成失败", err)
+					res.ResultFailWithMsg("token生成失败", c)
+					return
+				}
+				res.ResultOK(loginData, fmt.Sprintf("新用户建立%s登录成功", user.Username), c)
+			} else {
+				res.ResultOkWithMsg("不存在此电话的快递包裹", c)
+			}
+		}
+	}
+
+	if query.PickupCode != "" {
+		result := itemDb.Where("pickup_code", query.PickupCode).Find(&item).RowsAffected
+		// 包裹存在
+		if result > 0 {
+			re := userDb.Where("phone = ?", item.ReceiverPhone).Find(&user).RowsAffected
+			// 此包裹的接收人在本系统中存在
+			if re > 0 {
+				loginData, err := setUserLogin(user)
+
+				if err != nil {
+					global.Log.Error("token生成失败", err)
+					res.ResultFailWithMsg("token生成失败", c)
+					return
+				}
+				res.ResultOK(loginData, fmt.Sprintf("用户%s登录成功", user.Username), c)
+				return
+			}
+		} else { // 不存在依旧是建立
+			hashPassword := pwd.HashPassword("123456")
+			err := userDb.Create(&models.User{
+				Username:   item.ReceiverName,
+				Nickname:   item.ReceiverName,
+				Phone:      item.ReceiverPhone,
+				Email:      item.ReceiverEmail,
+				Password:   hashPassword,
+				Avatar:     "",
+				Status:     status.Enabled.String(),
+				Permission: ctype.PermissionUser,
+			}).Error
+			if err != nil {
+				global.Log.Error(err)
+				res.ResultFailWithMsg("角色创建失败", c)
+				return
+			}
+			if err := userDb.Where("phone = ?", query.Phone).Find(&user).Error; err != nil {
+				res.ResultFailWithMsg("未找到该用户", c)
+				return
+			}
+			loginData, err := setUserLogin(user)
+			if err != nil {
+				global.Log.Error("token生成失败", err)
+				res.ResultFailWithMsg("token生成失败", c)
+				return
+			}
+			res.ResultOK(loginData, fmt.Sprintf("新用户建立%s登录成功", user.Username), c)
+			return
+		}
+	}
+}
+
+// PickupVerifyView 用户取件
+func (UserApi) PickupVerifyView(c *gin.Context) {
+	var query UserSmartQuery
+	err := c.ShouldBindJSON(&query)
+	if err != nil {
+		res.ResultFailWithError(err, &query, c)
+		return
+	}
 }
 
 func (UserApi) UserRemoveView(c *gin.Context) {
