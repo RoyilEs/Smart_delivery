@@ -299,7 +299,7 @@ func (UserApi) UserSmartCreateView(c *gin.Context) {
 			if re > 0 {
 				hashPassword := pwd.HashPassword("123456")
 				err := userDb.Create(&models.User{
-					Username:   item.ReceiverName,
+					Username:   item.ReceiverPhone,
 					Nickname:   item.ReceiverName,
 					Phone:      item.ReceiverPhone,
 					Email:      item.ReceiverEmail,
@@ -350,7 +350,7 @@ func (UserApi) UserSmartCreateView(c *gin.Context) {
 		} else { // 不存在依旧是建立
 			hashPassword := pwd.HashPassword("123456")
 			err := userDb.Create(&models.User{
-				Username:   item.ReceiverName,
+				Username:   item.ReceiverPhone,
 				Nickname:   item.ReceiverName,
 				Phone:      item.ReceiverPhone,
 				Email:      item.ReceiverEmail,
