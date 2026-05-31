@@ -2,8 +2,10 @@ package utils
 
 import (
 	"Smart_delivery_locker/global"
+	"Smart_delivery_locker/models"
 	"crypto/md5"
 	"encoding/hex"
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"math/rand"
 	"reflect"
@@ -115,4 +117,43 @@ func DeleteByCondition[T any](slice []T, condition func(T) bool) []T {
 
 func ToISO8601(t time.Time) string {
 	return t.UTC().Format("2006-01-02T15:04:05.000Z")
+}
+
+// RecordPackageLog 记录包裹日志
+func RecordPackageLog(logisticsId, action, status, detail, operator, operatorId string, c *gin.Context) {
+	// 获取IP地址
+	ipAddress := c.ClientIP()
+
+	log := models.Package{
+		LogisticsId: logisticsId,
+		Action:      action,
+		Status:      status,
+		Detail:      detail,
+		Operator:    operator,
+		OperatorId:  operatorId,
+		IpAddress:   ipAddress,
+		CreatedAt:   time.Now().Format(time.RFC3339),
+	}
+
+	if err := global.DB.Create(&log).Error; err != nil {
+		global.Log.Errorf("记录包裹日志失败: %v", err)
+	}
+}
+
+// RecordPackageLogSimple 简化版记录日志（无gin.Context）
+func RecordPackageLogSimple(logisticsId, action, status, detail, operator, operatorId, ipAddress string) {
+	log := models.Package{
+		LogisticsId: logisticsId,
+		Action:      action,
+		Status:      status,
+		Detail:      detail,
+		Operator:    operator,
+		OperatorId:  operatorId,
+		IpAddress:   ipAddress,
+		CreatedAt:   time.Now().Format(time.RFC3339),
+	}
+
+	if err := global.DB.Create(&log).Error; err != nil {
+		global.Log.Errorf("记录包裹日志失败: %v", err)
+	}
 }

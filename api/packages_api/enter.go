@@ -3,8 +3,12 @@ package packages_api
 import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
+	"Smart_delivery_locker/models/ctype/action"
 	"Smart_delivery_locker/models/res"
+	"Smart_delivery_locker/utils"
+	"Smart_delivery_locker/utils/jwts"
 	"github.com/gin-gonic/gin"
+	"strconv"
 )
 
 type PackageApi struct{}
@@ -59,5 +63,12 @@ func (PackageApi) PackageUpdateVIew(c *gin.Context) {
 		return
 	}
 	global.DB.Find(&item, id)
+
+	cl, err := jwts.ParseToken(c.GetHeader("token"))
+	if err != nil {
+		res.ResultFailWithMsg("token解码错误", c)
+	}
+	utils.RecordPackageLog(item.LogisticsId, action.Updated.String(), models.PackageActionUpdate, "包裹更新成功", cl.Username, strconv.Itoa(int(cl.UserID)), c)
+
 	res.ResultOkWithData(item, c)
 }

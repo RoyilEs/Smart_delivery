@@ -4,6 +4,7 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/action"
 	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
@@ -21,6 +22,7 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -404,7 +406,11 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 				} else {
 					global.Log.Warnf("订单 %s 没有收件人邮箱，无法发送通知", item.LogisticsId)
 				}
-
+				cl, err := jwts.ParseToken(c.GetHeader("token"))
+				if err != nil {
+					res.ResultFailWithMsg("token解码错误", c)
+				}
+				utils.RecordPackageLog(item.LogisticsId, action.Stored.String(), models.PackageActionStore, "包裹入库成功", cl.Username, strconv.Itoa(int(cl.UserID)), c)
 				successCount++
 				break
 			}
@@ -544,6 +550,12 @@ func (GrilleApi) ItemOutGrilleView(c *gin.Context) {
 		iso8601 := utils.ToISO8601(time.Now())
 		global.DB.Model(&item).Update("grille_id", "").Update("status", "picked_up").Update("outbound_at", iso8601)
 		global.DB.Model(&grilles[i]).Update("logistics_id", "").Update("status", "idle")
+
+		cl, err := jwts.ParseToken(c.GetHeader("token"))
+		if err != nil {
+			res.ResultFailWithMsg("token解码错误", c)
+		}
+		utils.RecordPackageLog(item.LogisticsId, action.PickedUp.String(), models.PackageActionManualOutbound, "包裹出库成功", item.ReceiverName, strconv.Itoa(int(cl.UserID)), c)
 	}
 
 	// TODO 测试阶段不做删除

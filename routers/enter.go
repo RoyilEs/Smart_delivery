@@ -67,6 +67,8 @@ func (router Group) itemRouter() {
 func (router Group) packageRouter() {
 	packageApi := api.Api.PackagesApi
 	router.GET("packages", packageApi.PackageListView)
+	router.GET("packages_logs", packageApi.GetLogsList)
+	router.GET("packages/logs", packageApi.GetPackageLogs)
 	router.PUT("packages/:id", packageApi.PackageUpdateVIew)
 }
 

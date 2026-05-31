@@ -4,6 +4,7 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/service/redis_ser"
 	"Smart_delivery_locker/utils/jwts"
 	"Smart_delivery_locker/utils/pwd"
@@ -49,6 +50,7 @@ func (UserService) CreateUser(userName, password string, permission ctype.Role, 
 		Password:   hashPassword,
 		Permission: permission,
 		Avatar:     AVATAR,
+		Status:     status.Enabled.String(),
 	}).Error
 	if err != nil {
 		return err

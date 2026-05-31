@@ -4,13 +4,17 @@ import (
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/models"
 	"Smart_delivery_locker/models/ctype"
+	"Smart_delivery_locker/models/ctype/action"
 	"Smart_delivery_locker/models/ctype/status"
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
 	"Smart_delivery_locker/service/user_ser"
+	"Smart_delivery_locker/utils"
+	"Smart_delivery_locker/utils/jwts"
 	"Smart_delivery_locker/utils/pwd"
 	"github.com/gin-gonic/gin"
+	"strconv"
 	"strings"
 )
 
@@ -193,5 +197,12 @@ func (ItemApi) ItemCreateView(c *gin.Context) {
 		res.ResultFailWithMsg("包裹创建失败!", c)
 		return
 	}
+
+	cl, err := jwts.ParseToken(c.GetHeader("token"))
+	if err != nil {
+		res.ResultFailWithMsg("token解码错误", c)
+	}
+	utils.RecordPackageLog(item.LogisticsId, action.Created.String(), models.PackageActionCreate, "包裹创建成功", cl.Username, strconv.Itoa(int(cl.UserID)), c)
+
 	res.ResultOK(item, "包裹创建成功!", c)
 }

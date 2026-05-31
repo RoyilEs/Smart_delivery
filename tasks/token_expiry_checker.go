@@ -114,7 +114,6 @@ func processExpiredItem(item models.Item) error {
 
 	// 记录操作日志
 	recordAutoOutboundLog(item)
-
 	return nil
 }
 
