@@ -13,9 +13,10 @@ import (
 	"Smart_delivery_locker/utils"
 	"Smart_delivery_locker/utils/jwts"
 	"Smart_delivery_locker/utils/pwd"
-	"github.com/gin-gonic/gin"
 	"strconv"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 type ItemApi struct{}
@@ -167,32 +168,17 @@ func (ItemApi) ItemCreateView(c *gin.Context) {
 	}
 
 	// 检测这个邮寄用户是否在数据库中 不存在则建立
-	var (
-		receiverUser models.User
-		senderUser   models.User
-		count        int64
-	)
-	global.DB.Where("username = ?", cr.ReceiverName).Find(&receiverUser).Count(&count)
-	if count == 0 && receiverUser.Phone != cr.ReceiverPhone {
-		global.Log.Println("用户不存在直接建立")
-		err := user_ser.UserService{}.CreateUser(cr.ReceiverName, "", ctype.PermissionUser, cr.ReceiverEmail, cr.ReceiverPhone)
-		if err != nil {
-			global.Log.Error(err)
-			res.ResultFailWithMsg("用户创建失败!", c)
-			return
-		}
+	err := itemCreateUser(cr.ReceiverName, "", cr.ReceiverEmail, cr.ReceiverPhone, ctype.PermissionUser)
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("收件人用户创建失败", c)
 	}
-	global.DB.Where("username = ?", cr.SenderName).Find(&senderUser).Count(&count)
-	if count == 0 && senderUser.Phone != cr.SenderPhone {
-		global.Log.Println("用户不存在直接建立")
-		err := user_ser.UserService{}.CreateUser(cr.SenderName, "", ctype.PermissionUser, cr.SenderName, cr.SenderName)
-		if err != nil {
-			global.Log.Error(err)
-			res.ResultFailWithMsg("用户创建失败!", c)
-			return
-		}
+	err = itemCreateUser(cr.SenderName, "", cr.SenderEmail, cr.SenderPhone, ctype.PermissionUser)
+	if err != nil {
+		global.Log.Error(err)
+		res.ResultFailWithMsg("寄件人用户创建失败", c)
 	}
-	err := global.DB.Create(&item).Error
+	err = global.DB.Create(&item).Error
 	if err != nil {
 		res.ResultFailWithMsg("包裹创建失败!", c)
 		return
@@ -205,4 +191,26 @@ func (ItemApi) ItemCreateView(c *gin.Context) {
 	utils.RecordPackageLog(item.LogisticsId, action.Created.String(), models.PackageActionCreate, "包裹创建成功", cl.Username, strconv.Itoa(int(cl.UserID)), c)
 
 	res.ResultOK(item, "包裹创建成功!", c)
+}
+
+func itemCreateUser(
+	name, password, email, phone string,
+	role ctype.Role) error {
+
+	var existingUser models.User
+	global.DB.Where("phone = ?", phone).First(&existingUser)
+
+	if existingUser.ID != 0 {
+		global.Log.Printf("手机号 %s 已存在，跳过创建", phone)
+		return nil
+	}
+
+	// 电话号码不存在，创建新用户（允许用户名重复）
+	global.Log.Println("手机号验证通过，创建用户")
+	err := user_ser.UserService{}.CreateUser(name, password, role, email, phone)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

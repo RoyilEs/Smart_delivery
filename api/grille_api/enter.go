@@ -17,14 +17,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"math"
 	"math/big"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type GrilleApi struct{}
@@ -212,7 +213,7 @@ func GenerateGrilleIDs(matrix int, size ctype.Size, count int) ([]models.Grille,
 				MatrixRow:    row,
 				MatrixColumn: col,
 				Layer:        layer,
-				Status:       "idle",
+				Status:       status.Idle.String(),
 				Remark:       "",
 			}
 			grilles = append(grilles, grille)
