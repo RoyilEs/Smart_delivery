@@ -8,9 +8,12 @@ import (
 	"Smart_delivery_locker/models/res"
 	CODE "Smart_delivery_locker/models/res/code"
 	"Smart_delivery_locker/service/common"
+	"Smart_delivery_locker/service/email_ser"
 	"Smart_delivery_locker/utils"
 	"Smart_delivery_locker/utils/jwts"
+	"crypto/md5"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -246,9 +249,7 @@ type GrilleFormItemCreateResponse struct {
 // GrilleFormItemCreateView 通过订单ID创建格口
 func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 	var (
-		cr      GrilleFormItemCreateRequest
-		count   int
-		inItems []models.Item
+		cr GrilleFormItemCreateRequest
 	)
 	if err := c.ShouldBindJSON(&cr); err != nil {
 		res.ResultFailWithError(err, &cr, c)
@@ -260,62 +261,183 @@ func (GrilleApi) GrilleFormItemCreateView(c *gin.Context) {
 	for _, logisticsId := range cr.LogisticsIds {
 		item := models.Item{}
 		global.DB.Find(&item, "logistics_id = ?", logisticsId)
-		items = append(items, item)
+		if item.LogisticsId != "" { // 确保订单存在
+			items = append(items, item)
+		}
 	}
 
+	// 剔除已存在格口的订单
+	filteredItems := make([]models.Item, 0)
 	for _, item := range items {
-		if item.GrilleId != "" {
-			newItem := utils.DeleteByValue(items, item)
-			items = newItem
-			global.Log.Printf("%s存在在格口中已剔除", item.LogisticsId)
+		if item.GrilleId == "" {
+			filteredItems = append(filteredItems, item)
+		} else {
+			global.Log.Printf("%s 已存在格口中已剔除", item.LogisticsId)
 		}
+	}
+	items = filteredItems
+
+	if len(items) == 0 {
+		res.ResultFailWithMsg("没有需要放入的有效订单", c)
+		return
 	}
 
 	// 获取空格口
 	var grilles []models.Grille
-	if err := global.DB.Find(&grilles, "logistics_id = ?", "").Error; err != nil {
+	if err := global.DB.Find(&grilles, "logistics_id = ? AND status = ?", "", status.Idle.String()).Error; err != nil {
 		global.Log.Error("[error] 获取空格口失败", err)
+		res.ResultFailWithMsg("获取格口失败", c)
 		return
 	}
+
 	if len(grilles) < len(items) {
-		res.ResultFailWithMsg("格口数量不足 请管理员添加格口", c)
+		res.ResultFailWithMsg(fmt.Sprintf("格口数量不足，需要%d个，可用%d个", len(items), len(grilles)), c)
 		return
 	}
+
+	// 计算过期时间
+	timeoutHours := global.Config.Basic.PickupTimeoutHours
+	if timeoutHours <= 0 {
+		timeoutHours = 72 // 默认72小时
+	}
+	expireTime := time.Now().Add(time.Duration(timeoutHours) * time.Hour)
+	expireTimeStr := utils.ToISO8601(expireTime)
+
+	// 创建邮件服务实例
+	emailService := &email_ser.EmailService{}
+
+	// 记录成功处理的订单
+	successCount := 0
+	processedItems := make([]models.Item, 0)
 
 	for i, item := range items {
 		for j, grille := range grilles {
 			flag := IsItemFitGrille(item, grille)
-			// 成功则适配 检索下一个 放入表中
 			if flag && grille.Status == status.Idle.String() {
 				pickupCode := GeneratePickupCode(global.Config.Pickup.CodeLength)
-				global.DB.Model(&grilles[j]).
-					Update("logistics_id", item.LogisticsId).
-					Update("status", status.Occupied.String())
+				receiverToken := generateReceiverToken(item.LogisticsId)
+
+				// 开启事务
+				tx := global.DB.Begin()
+
+				// 更新格口信息
+				if err := tx.Model(&grilles[j]).
+					Updates(map[string]interface{}{
+						"logistics_id": item.LogisticsId,
+						"status":       status.Occupied.String(),
+					}).Error; err != nil {
+					tx.Rollback()
+					global.Log.Errorf("更新格口失败: %v", err)
+					continue
+				}
 
 				iso8601 := utils.ToISO8601(time.Now())
-				global.DB.Model(&items[i]).
-					Update("grille_id", grilles[j].GrilleId).
-					Update("cabinet_id", grilles[j].CabinetId).
-					Update("cabinet_code", grilles[j].CabinetCode).
-					Update("grille_status", grilles[j].Status).
-					Update("status", status.Stored.String()).
-					Update("pickup_code", pickupCode).
-					Update("inbound_at", iso8601)
-				count++
+
+				// 更新物品信息 - 注意：使用指针类型需要特殊处理
+				updates := map[string]interface{}{
+					"grille_id":      grilles[j].GrilleId,
+					"cabinet_id":     grilles[j].CabinetId,
+					"cabinet_code":   grilles[j].CabinetCode,
+					"grille_status":  grilles[j].Status,
+					"status":         status.Stored.String(),
+					"pickup_code":    pickupCode,
+					"receiver_token": receiverToken,
+					"expire_at":      expireTimeStr,
+					"inbound_at":     iso8601,
+				}
+
+				if err := tx.Model(&items[i]).Updates(updates).Error; err != nil {
+					tx.Rollback()
+					global.Log.Errorf("更新物品失败: %v", err)
+					continue
+				}
+
+				// 存储到Redis
+				if err := storeTokenToRedis(receiverToken, item.LogisticsId, expireTime); err != nil {
+					global.Log.Errorf("存储token到Redis失败: %v", err)
+				}
+
+				// 提交事务
+				if err := tx.Commit().Error; err != nil {
+					global.Log.Errorf("提交事务失败: %v", err)
+					continue
+				}
+
+				// 重新查询更新后的订单信息
+				var updatedItem models.Item
+				if err := global.DB.Where("logistics_id = ?", item.LogisticsId).First(&updatedItem).Error; err == nil {
+					processedItems = append(processedItems, updatedItem)
+				}
+
+				// 异步发送邮件（需要确保收件人邮箱不为空）
+				if item.ReceiverEmail != "" {
+					go func(itemCopy models.Item, grilleCopy models.Grille, code, expire string) {
+						defer func() {
+							if r := recover(); r != nil {
+								global.Log.Errorf("发送邮件时发生panic: %v", r)
+							}
+						}()
+
+						// 安全地获取过期时间字符串
+						var expireAtStr string
+						if itemCopy.ExpireAt != nil {
+							expireAtStr = *itemCopy.ExpireAt
+						} else {
+							expireAtStr = expire
+						}
+
+						err := emailService.SendPickupNotification(
+							itemCopy.ReceiverEmail,
+							itemCopy.ReceiverName,
+							code,
+							grilleCopy.CabinetCode,
+							grilleCopy.GrilleId,
+							expireAtStr,
+						)
+
+						if err != nil {
+							global.Log.Errorf("发送取件通知失败 [订单: %s]: %v", itemCopy.LogisticsId, err)
+						} else {
+							global.Log.Infof("取件通知已发送 [订单: %s, 收件人: %s]", itemCopy.LogisticsId, itemCopy.ReceiverEmail)
+						}
+					}(item, grille, pickupCode, expireTimeStr)
+				} else {
+					global.Log.Warnf("订单 %s 没有收件人邮箱，无法发送通知", item.LogisticsId)
+				}
+
+				successCount++
 				break
 			}
 		}
 	}
-	for _, in := range items {
-		item := models.Item{}
-		global.DB.Find(&item, "logistics_id = ?", in.LogisticsId)
-		inItems = append(inItems, item)
+
+	// 返回结果
+	if successCount == 0 {
+		res.ResultFailWithMsg("没有成功放入任何订单", c)
+		return
 	}
 
 	res.ResultOK(GrilleFormItemCreateResponse{
-		Count: count,
-		Items: inItems,
-	}, fmt.Sprintf("成功放入 %d 个订单", count), c)
+		Count: successCount,
+		Items: processedItems,
+	}, fmt.Sprintf("成功放入 %d 个订单，已发送邮件通知", successCount), c)
+}
+
+// generateReceiverToken 生成接收者令牌
+func generateReceiverToken(logisticsId string) string {
+	data := fmt.Sprintf("%s_%d", logisticsId, time.Now().UnixNano())
+	hash := md5.Sum([]byte(data))
+	return hex.EncodeToString(hash[:])
+}
+
+// storeTokenToRedis 存储token到Redis
+func storeTokenToRedis(token, logisticsId string, expireTime time.Time) error {
+	key := fmt.Sprintf("receiver_token:%s", token)
+	expiration := time.Until(expireTime)
+	if expiration <= 0 {
+		return fmt.Errorf("过期时间无效")
+	}
+	return global.Redis.Set(key, logisticsId, expiration).Err()
 }
 
 type GrilleCreateRequest struct {

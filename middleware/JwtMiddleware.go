@@ -3,6 +3,7 @@ package middleware
 import (
 	"Smart_delivery_locker/models/ctype"
 	"Smart_delivery_locker/models/res"
+	"Smart_delivery_locker/service/redis_ser"
 	"Smart_delivery_locker/utils/jwts"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -24,11 +25,11 @@ func JwtAuth() gin.HandlerFunc {
 		}
 		fmt.Println("claims", claims)
 		// 判断是否在redis中
-		//if redis_ser.CheckLogout(token) {
-		//	res.ResultFailWithMsg("token失效", c)
-		//	c.Abort()
-		//	return
-		//}
+		if redis_ser.CheckLogout(token) {
+			res.ResultFailWithMsg("token失效", c)
+			c.Abort()
+			return
+		}
 		// 登录的用户
 		c.Set("claims", claims)
 	}
@@ -49,12 +50,12 @@ func JwtAdmin() gin.HandlerFunc {
 			return
 		}
 		fmt.Println(claims)
-		//// 判断是否在redis中
-		//if redis_ser.CheckLogout(token) {
-		//	res.ResultFailWithMsg("token失效", c)
-		//	c.Abort()
-		//	return
-		//}
+		// 判断是否在redis中
+		if redis_ser.CheckLogout(token) {
+			res.ResultFailWithMsg("token失效", c)
+			c.Abort()
+			return
+		}
 		// 登录的用户
 		if ctype.Role(claims.Role) != ctype.PermissionAdmin {
 			res.ResultFailWithMsg("权限错误", c)

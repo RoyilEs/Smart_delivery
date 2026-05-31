@@ -19,7 +19,7 @@ system:
 site_info:
   created_at: "2026-02-28"
   title: Smart_delivery_locker
-  email: zxd2839182980@163.com
+  email: qq3392313023@163.com
   name: Roy
 jwt:
   secret: Roy
@@ -42,7 +42,7 @@ admin:
   bilibili: ""
 basic:
   site_name: 恶臭站点
-  pickup_time_out_hours: 48
+  pickup_time_out_hours: 72
   temperature_threshold: 114
   support_phone: "1145141919"
 pickup:
@@ -50,3 +50,8 @@ pickup:
   sms_reminder: true
   allow_anonymous_lookup: true
   animation_speed: normal
+from_mail:
+  host: smtp.163.com
+  port: 465
+  from: qq3392313023@163.com
+  password: GAvq2GzCQndQujKr

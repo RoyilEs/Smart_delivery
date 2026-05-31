@@ -5,6 +5,7 @@ import (
 	"Smart_delivery_locker/flag"
 	"Smart_delivery_locker/global"
 	"Smart_delivery_locker/routers"
+	"Smart_delivery_locker/tasks"
 )
 
 func main() {
@@ -12,7 +13,10 @@ func main() {
 	global.Log = core.InitLogger()
 	global.DB = core.InitGorm()
 
-	//global.Redis = core.ConnectRedis() //TODO 这里win无法正常启用 在功能为使用前不开启
+	global.Redis = core.ConnectRedis() //TODO 这里win无法正常启用 在功能为使用前不开启
+
+	// 启动token过期检测定时任务
+	tasks.StartTokenExpiryChecker()
 
 	//命令行参数绑定
 	option := flag.Parse()

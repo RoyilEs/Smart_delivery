@@ -12,4 +12,5 @@ type Config struct {
 	Admin    Admin    `yaml:"admin"`
 	Basic    Basic    `yaml:"basic"`
 	Pickup   Pickup   `yaml:"pickup"`
+	FromMail FromMail `yaml:"from_mail"`
 }
